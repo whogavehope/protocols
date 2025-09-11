@@ -80,7 +80,7 @@ def add_images_to_test_table(ws, films_data):
         for row in range(1, ws.max_row + 1):
             cell_value = ws[f'A{row}'].value
             # Более точный поиск - ищем точное совпадение с номером пленки
-            if cell_value and film['sidak_num'] in str(cell_value) and "09:30-17:30" in str(cell_value):
+            if cell_value and film['sidak_num'] in str(cell_value) in str(cell_value):
                 target_row = row
                 break
 
@@ -218,7 +218,7 @@ def add_images_to_test_table(ws, films_data):
 # ПОСТРОЕНИЕ ПРОТОКОЛА (в памяти) 
 # ============================
 
-def build_protocol(ws, films_data):
+def build_protocol(ws, films_data, test_type="Нагрев", author="", participant=""):
     """Заполняет переданный лист протоколом. НИЧЕГО не сохраняет на диск."""
     # Словарь для преобразования баллов в текст
     score_to_text = {
@@ -244,7 +244,7 @@ def build_protocol(ws, films_data):
     # НАЗВАНИЕ ПРОТОКОЛА
     film_numbers = ', '.join([film['sidak_num'] for film in films_data])
     current_date = datetime.now().strftime('%d.%m.%Yг.')
-    protocol_title_local = f'Протокол испытаний по определению стойкости поверхности в пленках {film_numbers} от {current_date}'
+    protocol_title_local = f'Протокол испытаний по определению стойкости поверхности фасада к воздействию жидкостей в пленках {film_numbers} от {current_date}'
 
     create_cell(ws, f'A{current_row}', protocol_title_local, bold=True, font_size=12, horizontal='center', wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
@@ -252,9 +252,9 @@ def build_protocol(ws, films_data):
     current_row += 2
 
     # 1. ЦЕЛЬ ПРОВЕДЕНИЯ ИСПЫТАНИЯ
-    create_cell(ws, f'A{current_row}', '1. Цель проведения испытания: определение стойкости неповреждённого декоративного и защитного покрытия к воздействию кофе, при комнатной температуре, в течении заданного времени в материалах:', bold=False, wrap_text=True)
+    create_cell(ws, f'A{current_row}', '1. Цель проведения испытания: определение стойкости неповреждённого декоративного и защитного покрытия к воздействию жидкостей, при комнатной температуре, в течении заданного времени в материалах:', bold=False, wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
-    ws.row_dimensions[current_row].height = 30
+    ws.row_dimensions[current_row].height = 45
     current_row += 1
 
     # Заголовок таблицы материалов
@@ -292,8 +292,9 @@ def build_protocol(ws, films_data):
     current_row += 1
 
     # 5. ПРИБОР
-    create_cell(ws, f'A{current_row}', '5. Оборудование для проведения испытаний: Чашки Петри, Кофе (готовый к применению напиток, на основе зернового материала, охлаждённый до комнатной температуры); Вода; Чистая сухая ветошь; мыльный раствор; скотч малярный (для фиксации образца на плоскости).', bold=True)
+    create_cell(ws, f'A{current_row}', '5. Оборудование для проведения испытаний: Чашки Петри, Кофе (готовый к применению напиток, на основе зернового материала, охлаждённый до комнатной температуры); Масло; Ацетон; Вода; Чистая сухая ветошь; мыльный раствор; скотч малярный (для фиксации образца на плоскости).', bold=True, wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
+    ws.row_dimensions[current_row].height = 60
     current_row += 1
 
     # 6. УСЛОВИЯ
@@ -306,15 +307,15 @@ def build_protocol(ws, films_data):
     create_cell(ws, f'A{current_row}', '7. Присутствовали:', bold=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
     current_row += 1
-    create_cell(ws, f'A{current_row}', 'Руководитель службы качества Камынин В.А. / Ведущий инженер-технолог Мкртчян А.Р.', wrap_text=True)
+    create_cell(ws, f'A{current_row}', f'{author}/{participant}', wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
     ws.row_dimensions[current_row].height = 30
     current_row += 1
 
     # 8. МЕТОД ОПРЕДЕЛЕНИЯ
-    create_cell(ws, f'A{current_row}', '8. Метод определения:  ГОСТ 27627-88.Продолжительность воздействия: - Кофе: 1 час.Расположить образец на ровную, твердую поверхность и зафиксировать малярным скотчем. Покрытие тщательно протереть сухой мягкой тканью. Выбранный для испытания реагент в объеме около 1 см.куб. вылить на образец и накрыть чашками Петри. По истечении времени испытания чашки Петри снять, оставшуюся жидкость осушить мягкой тканью, не допуская трения ее об испытуемую поверхность. Испытуемый образец выдержать, не накрывая, в течение 16-24 часов. После испытания и выдержки образцы сначала протирают тканью, смоченной в мыльном растворе, а затем водой и тщательно вытирают сухой тканью. По истечении 30 минут визуально оценить результат. ', bold=False, wrap_text=True)
+    create_cell(ws, f'A{current_row}', '8. Метод определения:  ГОСТ 27627-88.Продолжительность воздействия: - Кофе: 1 час; Масло: 1 час; Ацетон: 10 минут.Расположить образец на ровную, твердую поверхность и зафиксировать малярным скотчем. Покрытие тщательно протереть сухой мягкой тканью. Выбранный для испытания реагент в объеме около 1 см.куб. вылить на образец и накрыть чашками Петри. По истечении времени испытания чашки Петри снять, оставшуюся жидкость осушить мягкой тканью, не допуская трения ее об испытуемую поверхность. Испытуемый образец выдержать, не накрывая, в течение 16-24 часов. После испытания и выдержки образцы сначала протирают тканью, смоченной в мыльном растворе, а затем водой и тщательно вытирают сухой тканью. По истечении 30 минут визуально оценить результат. ', bold=False, wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
-    ws.row_dimensions[current_row].height = 60
+    ws.row_dimensions[current_row].height = 150
     current_row += 2
 
     # ТАБЛИЦА №2 - МАТЕРИАЛЫ ДЛЯ ИЗГОТОВЛЕНИЯ ОБРАЗЦОВ
@@ -344,16 +345,17 @@ def build_protocol(ws, films_data):
     ws.merge_cells(f'A{current_row}:D{current_row}')
     current_row += 1
 
-    create_cell(ws, f'A{current_row}', 'Время воздействия', bold=True, horizontal='center')
-    create_cell(ws, f'B{current_row}', 'Вид жидкости', bold=True, horizontal='center')
+    create_cell(ws, f'A{current_row}', 'Номер образца', bold=True, horizontal='center', wrap_text=True)
+    create_cell(ws, f'B{current_row}', 'Тип жидкости', bold=True, horizontal='center', wrap_text=True)
     create_cell(ws, f'C{current_row}', 'Состояние изделия', bold=True, horizontal='center')
     create_cell(ws, f'D{current_row}', 'Результат воздействия', bold=True, horizontal='center', wrap_text=True)
+    ws.row_dimensions[current_row].height = 30
     current_row += 1
 
     # Заполняем таблицу испытаний
     for film in films_data:
-        create_cell(ws, f'A{current_row}', f"{film.get('sidak_num', '')} 09:30-17:30", horizontal='center', wrap_text=True)
-        create_cell(ws, f'B{current_row}', 70, horizontal='center', wrap_text=True)
+        create_cell(ws, f'A{current_row}', f"{film.get('sidak_num', '')}_", horizontal='center', wrap_text=True)
+        create_cell(ws, f'B{current_row}', film.get('test_type', ''), horizontal='center', wrap_text=True)
         create_cell(ws, f'C{current_row}', '')
         create_cell(ws, f'D{current_row}', score_to_text.get(int(film.get('score', 0)), ''), horizontal='center', wrap_text=True)
         ws.row_dimensions[current_row].height = 200
@@ -403,10 +405,11 @@ def build_protocol(ws, films_data):
             ball_text = "балла"
 
         create_cell(ws, f'A{current_row}', f"Пленка {film.get('sidak_num', '')}")
-        create_cell(ws, f'B{current_row}', film.get('thickness', ''))
+        create_cell(ws, f'B{current_row}', film.get('thickness', ''), horizontal='center', wrap_text=True)
         # Результат (текст по баллам)
-        create_cell(ws, f'C{current_row}', score_to_text.get(score, ''))
-        create_cell(ws, f'D{current_row}', f"{score} {ball_text}", horizontal='center')
+        create_cell(ws, f'C{current_row}', score_to_text.get(score, ''),horizontal='center',wrap_text=True)
+        create_cell(ws, f'D{current_row}', f"{score} {ball_text}", horizontal='center', wrap_text=True)
+        ws.row_dimensions[current_row].height = 45
         current_row += 1
 
     current_row += 2  # Отступ после выводов
@@ -414,13 +417,13 @@ def build_protocol(ws, films_data):
     # ПОДПИСИ
     create_cell(ws, f'A{current_row}', 'Составил:', bold=True)
     current_row += 1
-    create_cell(ws, f'A{current_row}', 'Руководитель службы качества Камынин В.А.')
+    create_cell(ws, f'A{current_row}', f'{author}')
     ws.merge_cells(f'A{current_row}:D{current_row}')
     current_row += 2
 
     create_cell(ws, f'A{current_row}', 'Участники испытания:', bold=True)
     current_row += 1
-    create_cell(ws, f'A{current_row}', 'Руководитель службы качества Камынин В.А. / Ведущий инженер-технолог Мкртчян А.Р.')
+    create_cell(ws, f'A{current_row}', f'{author} / {participant}')
     ws.merge_cells(f'A{current_row}:D{current_row}')
     current_row += 3
 
@@ -452,7 +455,12 @@ def create_protocol(films_data, output_filename):
     ws = wb.active
     ws.title = "Лист1"
     # Сохраняем title в глобальной переменной
-    protocol_title = build_protocol(ws, films_data)
+    protocol_title = build_protocol(
+        ws,
+        films_data,
+        author=combo_author.get(),
+        participant=combo_participant.get()
+    )
     wb.save(output_filename)
     print(f"✅ Протокол создан: {output_filename}")
     return wb, ws
@@ -501,6 +509,7 @@ def show_input_form():
             'glue': glue,
             'thickness': thickness,
             'score': score,
+            'test_type': combo_test_type.get()
         }
 
     def add_film():
@@ -536,7 +545,13 @@ def show_input_form():
         ws = wb.active
         ws.title = "Лист1"
         # Сохраняем заголовок в глобальную переменную, чтобы его можно было использовать при сохранении файла
-        protocol_title = build_protocol(ws, films_data)
+        protocol_title = build_protocol(
+            ws,
+            films_data,
+            test_type=combo_test_type.get(),
+            author=combo_author.get(),
+            participant=combo_participant.get()
+        )
         # включаем панель изображений
         current_film_index = 0
         update_image_panel_state(enabled=True)
@@ -548,7 +563,7 @@ def show_input_form():
     def find_target_row_by_film(sidak_num):
         for row in range(1, ws.max_row + 1):
             cell_value = ws[f'A{row}'].value
-            if cell_value and sidak_num in str(cell_value) and "09:30-17:30" in str(cell_value):
+            if cell_value and sidak_num in str(cell_value) and "_" in str(cell_value):
                 return row
         return None
 
@@ -661,13 +676,39 @@ def show_input_form():
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось сохранить файл: {e}")
 
+
+
     # --- UI ---
     root = tk.Tk()
-    root.title("Протокол локального нагрева — ввод данных")
+    root.title("Протокол испытаний поверхности на воздействие жидкостей — ввод данных")
+
+    # --- Новые выпадающие списки ---
+    top = tk.LabelFrame(root, text="Общие параметры", padx=8, pady=8)
+    top.grid(row=0, column=0, columnspan=3, sticky="ew", padx=8, pady=(8,0))
+
+
+
+    tk.Label(top, text="Автор").grid(row=1, column=0, sticky="w")
+    combo_author = ttk.Combobox(top, width=50, values=[
+        "Руководитель службы качества Камынин В.А.",
+        "Специалист по качеству Павлова Н.А.",
+        "Специалист по качеству Сидорова А.И.",
+    ])
+    combo_author.current(0)  # по умолчанию "Камынин В.А."
+    combo_author.grid(row=1, column=1, padx=5, pady=2, sticky="w")
+
+    tk.Label(top, text="Участник").grid(row=2, column=0, sticky="w")
+    combo_participant = ttk.Combobox(top, width=50, values=[
+        "Ведущий инженер-технолог Мкртчян А.Р.",
+        ""
+    ])
+    combo_participant.current(1)
+    combo_participant.grid(row=2, column=1, padx=5, pady=2, sticky="w")
 
     # Левая панель: ввод одной плёнки
     left = tk.LabelFrame(root, text="Добавление плёнки", padx=8, pady=8)
-    left.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+
+    left.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
 
     tk.Label(left, text="Обозначение Sidak").grid(row=0, column=0, sticky="w")
     entry_sidak = tk.Entry(left, width=28); entry_sidak.grid(row=0, column=1, sticky="w")
@@ -676,7 +717,7 @@ def show_input_form():
     entry_supplier = tk.Entry(left, width=28); entry_supplier.grid(row=1, column=1, sticky="w")
 
     tk.Label(left, text="Листовой материал").grid(row=2, column=0, sticky="w")
-    combo_material = ttk.Combobox(left, width=26, values=[
+    combo_material = ttk.Combobox(left, width=35, values=[
         "МДФ белый 19 мм  Кроношпан",
         "МДФ 16 мм  Кроношпан",
         "МДФ 19 мм  Egger",
@@ -684,7 +725,7 @@ def show_input_form():
     combo_material.current(0); combo_material.grid(row=2, column=1, sticky="w")
 
     tk.Label(left, text="Клей").grid(row=3, column=0, sticky="w")
-    combo_glue = ttk.Combobox(left, width=26, values=[
+    combo_glue = ttk.Combobox(left, width=35, values=[
         "Клей Perfotak 154/3",
         "Клей Jowat 688.60",
         "Клей Henkel 701.20",
@@ -697,13 +738,21 @@ def show_input_form():
     tk.Label(left, text="Оценка (баллы)").grid(row=5, column=0, sticky="w")
     combo_score = ttk.Combobox(left, width=26, values=["5 баллов", "4 балла", "3 балла", "2 балла", "1 балл"])
     combo_score.current(0); combo_score.grid(row=5, column=1, sticky="w")
-
+    tk.Label(left, text="Вид испытания").grid(row=6, column=0, sticky="w")
+    combo_test_type = ttk.Combobox(left, width=26, values=[
+        "Нагрев - 8 часов",
+        "Кофе - 1 час",
+        "Масло - 1 час",
+        "Ацетон - 10 минут",
+    ])
+    combo_test_type.current(1)
+    combo_test_type.grid(row=6, column=1, sticky="w")
     btn_add = tk.Button(left, text="Добавить плёнку", command=add_film)
-    btn_add.grid(row=6, column=0, columnspan=2, pady=(8, 0), sticky="ew")
+    btn_add.grid(row=7, column=0, columnspan=2, pady=(8, 0), sticky="ew")
 
     # Центр: список добавленных плёнок
     center = tk.LabelFrame(root, text="Список плёнок", padx=8, pady=8)
-    center.grid(row=0, column=1, sticky="nsew", padx=8, pady=8)
+    center.grid(row=1, column=1, sticky="nsew", padx=8, pady=8)
 
     cols = ("Sidak", "Поставщик", "Толщина", "Оценка")
     tv = ttk.Treeview(center, columns=cols, show='headings', height=10)
@@ -720,7 +769,7 @@ def show_input_form():
 
     # Правая панель: изображения + сохранение
     right = tk.LabelFrame(root, text="Изображения и сохранение", padx=8, pady=8)
-    right.grid(row=0, column=2, sticky="nsew", padx=8, pady=8)
+    right.grid(row=1, column=2, sticky="nsew", padx=8, pady=8)
 
     lbl_info = tk.Label(right, text="После создания протокола добавьте картинки к каждой плёнке.")
     lbl_info.grid(row=0, column=0, columnspan=3, sticky="w")
