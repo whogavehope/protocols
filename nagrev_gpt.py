@@ -218,7 +218,7 @@ def add_images_to_test_table(ws, films_data):
 # ПОСТРОЕНИЕ ПРОТОКОЛА (в памяти) 
 # ============================
 
-def build_protocol(ws, films_data):
+def build_protocol(ws, films_data, test_type="Нагрев", author="", participant=""):
     """Заполняет переданный лист протоколом. НИЧЕГО не сохраняет на диск."""
     # Словарь для преобразования баллов в текст
     score_to_text = {
@@ -244,7 +244,7 @@ def build_protocol(ws, films_data):
     # НАЗВАНИЕ ПРОТОКОЛА
     film_numbers = ', '.join([film['sidak_num'] for film in films_data])
     current_date = datetime.now().strftime('%d.%m.%Yг.')
-    protocol_title_local = f'Протокол испытаний на локальный нагрев фасада в пленках {film_numbers} от {current_date}'
+    protocol_title_local = f'Протокол испытаний на {test_type.lower()} фасада в пленках {film_numbers} от {current_date}'
 
     create_cell(ws, f'A{current_row}', protocol_title_local, bold=True, font_size=12, horizontal='center', wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
@@ -306,7 +306,7 @@ def build_protocol(ws, films_data):
     create_cell(ws, f'A{current_row}', '7. Присутствовали:', bold=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
     current_row += 1
-    create_cell(ws, f'A{current_row}', 'Руководитель службы качества Камынин В.А. / Ведущий инженер-технолог Мкртчян А.Р.', wrap_text=True)
+    create_cell(ws, f'A{current_row}', f'{author}/{participant}', wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
     ws.row_dimensions[current_row].height = 30
     current_row += 1
@@ -414,13 +414,13 @@ def build_protocol(ws, films_data):
     # ПОДПИСИ
     create_cell(ws, f'A{current_row}', 'Составил:', bold=True)
     current_row += 1
-    create_cell(ws, f'A{current_row}', 'Руководитель службы качества Камынин В.А.')
+    create_cell(ws, f'A{current_row}', f'{author}')
     ws.merge_cells(f'A{current_row}:D{current_row}')
     current_row += 2
 
     create_cell(ws, f'A{current_row}', 'Участники испытания:', bold=True)
     current_row += 1
-    create_cell(ws, f'A{current_row}', 'Руководитель службы качества Камынин В.А. / Ведущий инженер-технолог Мкртчян А.Р.')
+    create_cell(ws, f'A{current_row}', f'{author} / {participant}')
     ws.merge_cells(f'A{current_row}:D{current_row}')
     current_row += 3
 
@@ -536,7 +536,13 @@ def show_input_form():
         ws = wb.active
         ws.title = "Лист1"
         # Сохраняем заголовок в глобальную переменную, чтобы его можно было использовать при сохранении файла
-        protocol_title = build_protocol(ws, films_data)
+        protocol_title = build_protocol(
+            ws,
+            films_data,
+            test_type=combo_test_type.get(),
+            author=combo_author.get(),
+            participant=combo_participant.get()
+        )
         # включаем панель изображений
         current_film_index = 0
         update_image_panel_state(enabled=True)
@@ -661,13 +667,47 @@ def show_input_form():
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось сохранить файл: {e}")
 
+
+
     # --- UI ---
     root = tk.Tk()
     root.title("Протокол локального нагрева — ввод данных")
 
+    # --- Новые выпадающие списки ---
+    top = tk.LabelFrame(root, text="Общие параметры", padx=8, pady=8)
+    top.grid(row=0, column=0, columnspan=3, sticky="ew", padx=8, pady=(8,0))
+
+    tk.Label(top, text="Вид испытания").grid(row=0, column=0, sticky="w")
+    combo_test_type = ttk.Combobox(top, width=30, values=[
+        "Нагрев",
+        "Воздействие кофе",
+        "Воздействие масла",
+        "Воздействие ацетона",
+    ])
+    combo_test_type.current(0)  # по умолчанию "Нагрев"
+    combo_test_type.grid(row=0, column=1, padx=5, pady=2, sticky="w")
+
+    tk.Label(top, text="Автор").grid(row=1, column=0, sticky="w")
+    combo_author = ttk.Combobox(top, width=50, values=[
+        "Руководитель службы качества Камынин В.А.",
+        "Специалист по качеству Павлова Н.А.",
+        "Специалист по качеству Сидорова А.И.",
+    ])
+    combo_author.current(0)  # по умолчанию "Камынин В.А."
+    combo_author.grid(row=1, column=1, padx=5, pady=2, sticky="w")
+
+    tk.Label(top, text="Участник").grid(row=2, column=0, sticky="w")
+    combo_participant = ttk.Combobox(top, width=50, values=[
+        "Ведущий инженер-технолог Мкртчян А.Р.",
+        ""
+    ])
+    combo_participant.current(0)
+    combo_participant.grid(row=2, column=1, padx=5, pady=2, sticky="w")
+
     # Левая панель: ввод одной плёнки
     left = tk.LabelFrame(root, text="Добавление плёнки", padx=8, pady=8)
-    left.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+
+    left.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
 
     tk.Label(left, text="Обозначение Sidak").grid(row=0, column=0, sticky="w")
     entry_sidak = tk.Entry(left, width=28); entry_sidak.grid(row=0, column=1, sticky="w")
@@ -676,7 +716,7 @@ def show_input_form():
     entry_supplier = tk.Entry(left, width=28); entry_supplier.grid(row=1, column=1, sticky="w")
 
     tk.Label(left, text="Листовой материал").grid(row=2, column=0, sticky="w")
-    combo_material = ttk.Combobox(left, width=26, values=[
+    combo_material = ttk.Combobox(left, width=35, values=[
         "МДФ белый 19 мм  Кроношпан",
         "МДФ 16 мм  Кроношпан",
         "МДФ 19 мм  Egger",
@@ -684,7 +724,7 @@ def show_input_form():
     combo_material.current(0); combo_material.grid(row=2, column=1, sticky="w")
 
     tk.Label(left, text="Клей").grid(row=3, column=0, sticky="w")
-    combo_glue = ttk.Combobox(left, width=26, values=[
+    combo_glue = ttk.Combobox(left, width=35, values=[
         "Клей Perfotak 154/3",
         "Клей Jowat 688.60",
         "Клей Henkel 701.20",
@@ -703,7 +743,7 @@ def show_input_form():
 
     # Центр: список добавленных плёнок
     center = tk.LabelFrame(root, text="Список плёнок", padx=8, pady=8)
-    center.grid(row=0, column=1, sticky="nsew", padx=8, pady=8)
+    center.grid(row=1, column=1, sticky="nsew", padx=8, pady=8)
 
     cols = ("Sidak", "Поставщик", "Толщина", "Оценка")
     tv = ttk.Treeview(center, columns=cols, show='headings', height=10)
@@ -720,7 +760,7 @@ def show_input_form():
 
     # Правая панель: изображения + сохранение
     right = tk.LabelFrame(root, text="Изображения и сохранение", padx=8, pady=8)
-    right.grid(row=0, column=2, sticky="nsew", padx=8, pady=8)
+    right.grid(row=1, column=2, sticky="nsew", padx=8, pady=8)
 
     lbl_info = tk.Label(right, text="После создания протокола добавьте картинки к каждой плёнке.")
     lbl_info.grid(row=0, column=0, columnspan=3, sticky="w")
