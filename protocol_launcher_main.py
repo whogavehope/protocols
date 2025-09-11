@@ -4,14 +4,14 @@ from tkinter import ttk, messagebox
 # Здесь подключаем функцию из существующего протокола
 # Например, nagrev_gpt.py содержит show_input_form
 from nagrev_gpt import show_input_form as show_nagrev_protocol
-
+from liquid import show_input_form as show_liquid_protocol
 # Для остальных протоколов можно будет создать аналогичные функции:
 # from liquid_test import show_input_form as show_liquid_protocol
 # from hardness_test import show_input_form as show_hardness_protocol
 
 PROTOCOLS = {
     "Протокол по локальному нагреву": show_nagrev_protocol,
-    # "Протокол испытания на воздействие жидкостей": show_liquid_protocol,
+    "Протокол испытания на воздействие жидкостей": show_liquid_protocol,
     # "Протокол испытания на твердость покрытия": show_hardness_protocol,
 }
 
