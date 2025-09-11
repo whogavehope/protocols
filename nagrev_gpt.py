@@ -14,6 +14,8 @@ from openpyxl.drawing.spreadsheet_drawing import AnchorMarker
 from openpyxl.utils.units import pixels_to_EMU
 from openpyxl.worksheet.pagebreak import RowBreak  # разрыв страниц
 
+# Глобальная переменная для имени протокола (для использования при сохранении)
+protocol_title = ""
 
 # ============================
 # УТИЛИТЫ ДЛЯ ОФОРМЛЕНИЯ
@@ -242,9 +244,9 @@ def build_protocol(ws, films_data):
     # НАЗВАНИЕ ПРОТОКОЛА
     film_numbers = ', '.join([film['sidak_num'] for film in films_data])
     current_date = datetime.now().strftime('%d.%m.%Yг.')
-    protocol_title = f'Протокол испытаний на локальный нагрев фасада в пленках\n{film_numbers} от {current_date}'
+    protocol_title_local = f'Протокол испытаний на локальный нагрев фасада в пленках {film_numbers} от {current_date}'
 
-    create_cell(ws, f'A{current_row}', protocol_title, bold=True, font_size=12, horizontal='center', wrap_text=True)
+    create_cell(ws, f'A{current_row}', protocol_title_local, bold=True, font_size=12, horizontal='center', wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
     ws.row_dimensions[current_row].height = 30
     current_row += 2
@@ -252,6 +254,7 @@ def build_protocol(ws, films_data):
     # 1. ЦЕЛЬ ПРОВЕДЕНИЯ ИСПЫТАНИЯ
     create_cell(ws, f'A{current_row}', '1. Цель проведения испытания: оценить прочность покрытия при нагреве фасада в материалах:', bold=False, wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
+    ws.row_dimensions[current_row].height = 30
     current_row += 1
 
     # Заголовок таблицы материалов
@@ -342,7 +345,7 @@ def build_protocol(ws, films_data):
     current_row += 1
 
     create_cell(ws, f'A{current_row}', 'Время нагрева', bold=True, horizontal='center')
-    create_cell(ws, f'B{current_row}', 't° C термошкафа', bold=True, horizontal='center')
+    create_cell(ws, f'B{current_row}', 't° C', bold=True, horizontal='center')
     create_cell(ws, f'C{current_row}', 'Состояние изделия', bold=True, horizontal='center')
     create_cell(ws, f'D{current_row}', 'Результат нагрева', bold=True, horizontal='center', wrap_text=True)
     current_row += 1
@@ -438,14 +441,18 @@ def build_protocol(ws, films_data):
     ws.column_dimensions['D'].width = 25
 
     setup_print_settings(ws)
+    # возвращаем title (строка с переносом \n)
+    return protocol_title_local
 
 
 def create_protocol(films_data, output_filename):
     """Создаёт новую книгу, заполняет протокол и СРАЗУ сохраняет на диск (совместимость со старым поведением)."""
+    global protocol_title
     wb = Workbook()
     ws = wb.active
     ws.title = "Лист1"
-    build_protocol(ws, films_data)
+    # Сохраняем title в глобальной переменной
+    protocol_title = build_protocol(ws, films_data)
     wb.save(output_filename)
     print(f"✅ Протокол создан: {output_filename}")
     return wb, ws
@@ -521,13 +528,15 @@ def show_input_form():
 
     def make_protocol_memory():
         nonlocal wb, ws, current_film_index
+        global protocol_title
         if not films_data:
             messagebox.showwarning("Ошибка", "Сначала добавьте хотя бы одну плёнку")
             return
         wb = Workbook()
         ws = wb.active
         ws.title = "Лист1"
-        build_protocol(ws, films_data)
+        # Сохраняем заголовок в глобальную переменную, чтобы его можно было использовать при сохранении файла
+        protocol_title = build_protocol(ws, films_data)
         # включаем панель изображений
         current_film_index = 0
         update_image_panel_state(enabled=True)
@@ -623,14 +632,26 @@ def show_input_form():
         messagebox.showinfo("Завершено", "Добавление картинок пропущено!")
 
     def save_protocol_to_file():
+        global protocol_title
         if ws is None:
             messagebox.showwarning("Внимание", "Сначала создайте протокол")
             return
+        # очищаем название протокола для использования в имени файла
+        safe_title = protocol_title if protocol_title else "Новый_протокол_испытаний"
+        # заменяем недопустимые для имени файла символы
+        invalid = r'<>:"/\\|?*'
+        safe_title = "".join([c if c not in invalid else "_" for c in safe_title])
+        # убираем переносы строк
+        safe_title = safe_title.replace("\\n", " ").replace("\n", " ").strip()
+        # ограничим длину, чтобы не было проблем с ОС
+        if len(safe_title) > 120:
+            safe_title = safe_title[:120]
+
         filename = filedialog.asksaveasfilename(
             title="Сохранить протокол как",
             defaultextension=".xlsx",
             filetypes=[("Excel files", "*.xlsx")],
-            initialfile="Новый_протокол_испытаний.xlsx"
+            initialfile=f"{safe_title}.xlsx"
         )
         if not filename:
             return
