@@ -80,7 +80,7 @@ def add_images_to_test_table(ws, films_data):
         for row in range(1, ws.max_row + 1):
             cell_value = ws[f'A{row}'].value
             # Более точный поиск - ищем точное совпадение с номером пленки
-            if cell_value and film['sidak_num'] in str(cell_value) in str(cell_value):
+            if cell_value and film['sidak_num'] in str(cell_value) and "_" in str(cell_value):
                 target_row = row
                 break
 
@@ -242,7 +242,8 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 6
 
     # НАЗВАНИЕ ПРОТОКОЛА
-    film_numbers = ', '.join([film['sidak_num'] for film in films_data])
+    unique_film_numbers = sorted(list(set([film['sidak_num'] for film in films_data])))
+    film_numbers = ', '.join(unique_film_numbers)
     current_date = datetime.now().strftime('%d.%m.%Yг.')
     protocol_title_local = f'Протокол испытаний по определению стойкости поверхности фасада к воздействию жидкостей в пленках {film_numbers} от {current_date}'
 
@@ -265,7 +266,16 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     # Заполняем таблицу материалов
+    # Создаем список уникальных пленок на основе 'sidak_num'
+    unique_films = []
+    seen_sidak_nums = set()
     for film in films_data:
+        if film['sidak_num'] not in seen_sidak_nums:
+            unique_films.append(film)
+            seen_sidak_nums.add(film['sidak_num'])
+
+    # Теперь используем уникальный список для заполнения таблицы
+    for film in unique_films:
         create_cell(ws, f'A{current_row}', 'Пленка', horizontal='center')
         create_cell(ws, f'B{current_row}', film.get('sidak_num', ''), horizontal='center')
         create_cell(ws, f'C{current_row}', film.get('supplier_name', ''), horizontal='center')
@@ -330,7 +340,8 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     # Заполняем таблицу образцов (используем выбранные материал и клей, если переданы)
-    for i, film in enumerate(films_data, 1):
+    # Теперь используем уникальный список для заполнения таблицы
+    for i, film in enumerate(unique_films, 1):
         create_cell(ws, f'A{current_row}', i, horizontal='center')
         create_cell(ws, f'B{current_row}', film.get('material', 'МДФ белый 19 мм  Кроношпан'), horizontal='center', wrap_text=True)
         create_cell(ws, f'C{current_row}', film.get('glue', 'Клей Perfotak 154/3'), horizontal='center', wrap_text=True)
@@ -343,9 +354,12 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     # ТАБЛИЦА №3 - ИСПЫТАНИЯ ОБРАЗЦОВ
     create_cell(ws, f'A{current_row}', 'Таблица №3 Испытания образцов', bold=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
+    # СОХРАНЯЕМ НАЧАЛЬНУЮ СТРОКУ ТАБЛИЦЫ №3 В ГЛОБАЛЬНУЮ ПЕРЕМЕННУЮ
+    global start_row_for_table_3
+    start_row_for_table_3 = current_row + 2
     current_row += 1
 
-    create_cell(ws, f'A{current_row}', 'Номер образца', bold=True, horizontal='center', wrap_text=True)
+    create_cell(ws, f'A{current_row}', 'Номер пленки', bold=True, horizontal='center', wrap_text=True)
     create_cell(ws, f'B{current_row}', 'Тип жидкости', bold=True, horizontal='center', wrap_text=True)
     create_cell(ws, f'C{current_row}', 'Состояние изделия', bold=True, horizontal='center')
     create_cell(ws, f'D{current_row}', 'Результат воздействия', bold=True, horizontal='center', wrap_text=True)
@@ -389,10 +403,11 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     ws.merge_cells(f'A{current_row}:D{current_row}')
     current_row += 1
 
-    create_cell(ws, f'A{current_row}', 'Материал', bold=True, horizontal='center')
+    create_cell(ws, f'A{current_row}', '№ пленки/Испытание', bold=True, horizontal='center', wrap_text=True)
     create_cell(ws, f'B{current_row}', 'Толщина', bold=True, horizontal='center')
     create_cell(ws, f'C{current_row}', 'Результат', bold=True, horizontal='center')
     create_cell(ws, f'D{current_row}', 'Оценка', bold=True, horizontal='center')
+    ws.row_dimensions[current_row].height = 30
     current_row += 1
 
     # Заполняем таблицу выводов
@@ -404,7 +419,7 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
         elif 2 <= score <= 4:
             ball_text = "балла"
 
-        create_cell(ws, f'A{current_row}', f"Пленка {film.get('sidak_num', '')}")
+        create_cell(ws, f'A{current_row}', f"{film.get('sidak_num', '')} / {film.get('test_type', '')}", wrap_text=True)
         create_cell(ws, f'B{current_row}', film.get('thickness', ''), horizontal='center', wrap_text=True)
         # Результат (текст по баллам)
         create_cell(ws, f'C{current_row}', score_to_text.get(score, ''),horizontal='center',wrap_text=True)
@@ -518,11 +533,8 @@ def show_input_form():
             return
         films_data.append(film)
         # в таблицу
-        tv.insert('', 'end', values=(film['sidak_num'], film['supplier_name'], film['thickness'], film['score']))
-        # очистка
-        entry_sidak.delete(0, tk.END)
-        entry_supplier.delete(0, tk.END)
-        entry_thickness.delete(0, tk.END)
+        tv.insert('', 'end', values=(film['sidak_num'], film['supplier_name'], film['thickness'], film['score'], film['test_type']))
+
         entry_sidak.focus_set()
 
     def delete_selected():
@@ -559,6 +571,7 @@ def show_input_form():
         btn_save.config(state='normal')
         messagebox.showinfo("Готово", "Протокол сформирован в памяти. Теперь можно добавить картинки и сохранить файл.")
 
+    # ---- Панель изображений (встроенная) ----
     # ---- Панель изображений (встроенная) ----
     def find_target_row_by_film(sidak_num):
         for row in range(1, ws.max_row + 1):
@@ -630,6 +643,7 @@ def show_input_form():
                 messagebox.showinfo("Завершено", "Все картинки добавлены!")
                 update_image_panel_state(False)
             update_current_film_label()
+
 
     def image_skip_one():
         nonlocal current_film_index
@@ -742,7 +756,7 @@ def show_input_form():
     combo_test_type = ttk.Combobox(left, width=26, values=[
         "Нагрев - 8 часов",
         "Кофе - 1 час",
-        "Масло - 1 час",
+        "Масло - 24 часа",
         "Ацетон - 10 минут",
     ])
     combo_test_type.current(1)
@@ -754,9 +768,9 @@ def show_input_form():
     center = tk.LabelFrame(root, text="Список плёнок", padx=8, pady=8)
     center.grid(row=1, column=1, sticky="nsew", padx=8, pady=8)
 
-    cols = ("Sidak", "Поставщик", "Толщина", "Оценка")
+    cols = ("Sidak", "Поставщик", "Толщина", "Оценка", "Вид испытания")
     tv = ttk.Treeview(center, columns=cols, show='headings', height=10)
-    for c, w in zip(cols, (100, 150, 80, 60)):
+    for c, w in zip(cols, (100, 150, 80, 60, 100)):
         tv.heading(c, text=c)
         tv.column(c, width=w, anchor='center')
     tv.grid(row=0, column=0, columnspan=2, sticky="nsew")
