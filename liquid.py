@@ -621,7 +621,7 @@ def show_input_form():
         try:
             from PIL import Image as PILImage
             pil_img = PILImage.open(file_path)
-            max_width, max_height = 300, 250
+            max_width, max_height = 220, 400
             orig_width, orig_height = pil_img.size
             width_ratio = max_width / orig_width
             height_ratio = max_height / orig_height
