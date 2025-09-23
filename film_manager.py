@@ -65,7 +65,7 @@ def add_film_window():
 
 def delete_film_window():
     def delete_film():
-        selected_film = combo_films.get()
+        selected_film = entry_sidak.get().strip()
         if not selected_film:
             messagebox.showerror("Ошибка", "Выберите плёнку для удаления")
             return
@@ -88,15 +88,23 @@ def delete_film_window():
 
     win = ctk.CTkToplevel()
     win.title("Удалить плёнку")
+    win.geometry("400x300")
 
-    ctk.CTkLabel(win, text="Выберите плёнку").pack(pady=5)
-    
-    films = get_all_films()
-    combo_films = ctk.CTkComboBox(win, values=films, width=300)
-    combo_films.pack(pady=5)
+    ctk.CTkLabel(win, text="Введите или выберите номер Sidak").pack(pady=(20, 5))
+
+    # Создаём фильтруемое поле
+    entry_sidak, results_frame = create_filterable_sidak_selector(
+        parent=win,
+        initial_x=50,
+        initial_y=60,
+        width=300,
+        on_select_callback=None  # не нужно ничего делать при выборе, кроме заполнения поля
+    )
 
     btn_delete = ctk.CTkButton(win, text="Удалить", command=delete_film, fg_color="red", hover_color="darkred")
-    btn_delete.pack(pady=10)
+    btn_delete.place(x=100, y=250)  # или ниже, например y=270  # отступ снизу, чтобы кнопка не перекрывалась выпадающим списком
+
+    win.mainloop()
 
 def import_from_excel():
     try:
@@ -160,10 +168,9 @@ def import_from_excel():
         messagebox.showerror("Ошибка", f"Произошла ошибка при импорте: {e}")
 
 def edit_film_window():
-    def on_film_selected(choice):
-        selected_sidak = choice
-        if selected_sidak:
-            details = get_film_details(selected_sidak)
+    def on_film_selected(sidak_num):
+        if sidak_num:
+            details = get_film_details(sidak_num)
             if details:
                 entry_edit_supplier.delete(0, ctk.END)
                 entry_edit_supplier.insert(0, details[0])
@@ -172,9 +179,9 @@ def edit_film_window():
             else:
                 entry_edit_supplier.delete(0, ctk.END)
                 entry_edit_thickness.delete(0, ctk.END)
-    
+
     def update_film():
-        sidak = combo_edit_films.get().strip()
+        sidak = entry_sidak.get().strip()
         supplier = entry_edit_supplier.get().strip()
         try:
             thickness = float(entry_edit_thickness.get().replace(",", "."))
@@ -189,6 +196,15 @@ def edit_film_window():
         conn = sqlite3.connect("films.db")
         cur = conn.cursor()
         try:
+            # Проверяем, существует ли плёнка
+            cur.execute("SELECT 1 FROM films WHERE sidak_num = ?", (sidak,))
+            exists = cur.fetchone()
+
+            if not exists:
+                messagebox.showerror("Ошибка", f"Плёнка с номером {sidak} не найдена в базе данных")
+                return
+
+            # Обновляем, если существует
             cur.execute("UPDATE films SET supplier_name = ?, thickness = ? WHERE sidak_num = ?",
                         (supplier, thickness, sidak))
             conn.commit()
@@ -198,22 +214,125 @@ def edit_film_window():
             messagebox.showerror("Ошибка", f"Произошла ошибка: {e}")
         finally:
             conn.close()
+    def check_film_exists(event=None):
+        sidak = entry_sidak.get().strip()
+        if not sidak:
+            btn_save.configure(state="disabled")
+            return
 
+        conn = sqlite3.connect("films.db")
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM films WHERE sidak_num = ?", (sidak,))
+        exists = cur.fetchone()
+        conn.close()
+
+        if exists:
+            btn_save.configure(state="normal")
+        else:
+            btn_save.configure(state="disabled")
     win = ctk.CTkToplevel()
     win.title("Редактировать плёнку")
+    win.geometry("400x350")
 
-    ctk.CTkLabel(win, text="Выберите плёнку").grid(row=0, column=0, sticky="w", padx=10, pady=5)
-    
-    films = get_all_films()
-    combo_edit_films = ctk.CTkComboBox(win, values=films, width=300, command=on_film_selected)
-    combo_edit_films.grid(row=0, column=1, padx=5, pady=5)
+    ctk.CTkLabel(win, text="Введите или выберите номер Sidak").place(x=50, y=20)
 
-    ctk.CTkLabel(win, text="Поставщик").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+    def on_film_selected_and_check(sidak_num):
+        on_film_selected(sidak_num)        # заполняем поля
+        check_film_exists()                # проверяем существование и активируем кнопку
+
+    entry_sidak, results_frame = create_filterable_sidak_selector(
+        parent=win,
+        initial_x=50,
+        initial_y=50,
+        width=300,
+        on_select_callback=on_film_selected_and_check
+    )
+
+    ctk.CTkLabel(win, text="Поставщик").place(x=50, y=120)
     entry_edit_supplier = ctk.CTkEntry(win, width=300)
-    entry_edit_supplier.grid(row=1, column=1, padx=5, pady=5)
+    entry_edit_supplier.place(x=50, y=150)
 
-    ctk.CTkLabel(win, text="Толщина").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+    ctk.CTkLabel(win, text="Толщина").place(x=50, y=190)
     entry_edit_thickness = ctk.CTkEntry(win, width=300)
-    entry_edit_thickness.grid(row=2, column=1, padx=5, pady=5)
+    entry_edit_thickness.place(x=50, y=220)
 
-    ctk.CTkButton(win, text="Сохранить изменения", command=update_film, fg_color="blue", hover_color="darkblue").grid(row=3, columnspan=2, pady=10)
+    btn_save = ctk.CTkButton(win, text="Сохранить изменения", command=update_film, fg_color="blue", hover_color="darkblue", state="disabled")
+    btn_save.place(x=100, y=270)
+
+    # Привязываем проверку к изменению поля ввода
+    entry_sidak.bind("<KeyRelease>", check_film_exists)
+    # Проверяем при открытии окна
+    check_film_exists()
+
+    win.mainloop()
+
+def create_filterable_sidak_selector(parent, initial_x, initial_y, width, on_select_callback):
+    """
+    Создаёт фильтруемый выпадающий список Sidak номеров, как в liquid.py
+    :param parent: родительское окно
+    :param initial_x: x-координата поля ввода (относительно parent)
+    :param initial_y: y-координата поля ввода
+    :param width: ширина поля ввода и выпадающего списка
+    :param on_select_callback: функция, вызываемая при выборе элемента (принимает sidak_num)
+    :return: (entry_widget, results_frame) — поле ввода и фрейм для результатов
+    """
+    # Поле ввода
+    entry_sidak = ctk.CTkEntry(parent, width=width)
+    entry_sidak.place(x=initial_x, y=initial_y)
+
+    # Фрейм для выпадающего списка
+    results_frame = ctk.CTkScrollableFrame(parent, width=width, height=200)
+
+    # Глобальные флаги
+    is_dropdown_open = False
+
+    def select_from_list(sidak_num):
+        nonlocal is_dropdown_open
+        entry_sidak.delete(0, 'end')
+        entry_sidak.insert(0, sidak_num)
+        results_frame.place_forget()
+        is_dropdown_open = False
+        if on_select_callback:
+            on_select_callback(sidak_num)
+
+    def filter_sidak(event=None):
+        nonlocal is_dropdown_open
+        text = entry_sidak.get().strip().lower()
+
+        # Очищаем выпадающий список
+        for widget in results_frame.winfo_children():
+            widget.destroy()
+
+        # Фильтруем данные из базы
+        try:
+            conn = sqlite3.connect("films.db")
+            cur = conn.cursor()
+            cur.execute("SELECT sidak_num FROM films WHERE lower(sidak_num) LIKE ? ORDER BY sidak_num", (f'%{text}%',))
+            filtered_sidak = [r[0] for r in cur.fetchall()]
+            conn.close()
+        except sqlite3.Error as e:
+            messagebox.showerror("Ошибка", f"Не удалось подключиться к базе данных: {e}")
+            return
+
+        if not filtered_sidak:
+            results_frame.place_forget()
+            is_dropdown_open = False
+            return
+
+        # Получаем абсолютные координаты поля ввода ОТНОСИТЕЛЬНО ОКНА
+        x_pos = initial_x
+        y_pos = initial_y + entry_sidak.winfo_height() + 5  # +5 для отступа
+
+        # Размещаем выпадающий список
+        results_frame.place(x=x_pos, y=y_pos)
+        results_frame.lift()  # ← ПОДНИМАЕМ НА ВЕРХНИЙ СЛОЙ!
+        is_dropdown_open = True
+
+        for sidak in filtered_sidak:
+            btn = ctk.CTkButton(results_frame, text=sidak, command=lambda s=sidak: select_from_list(s))
+            btn.pack(fill="x", pady=2)
+
+    # Привязываем событие ввода
+    entry_sidak.bind("<KeyRelease>", filter_sidak)
+
+    return entry_sidak, results_frame

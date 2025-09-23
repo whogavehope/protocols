@@ -194,7 +194,7 @@ def add_images_to_test_table(ws, films_data):
         text="Пропустить эту",
         command=skip_film,
         fg_color="yellow",
-        hover_color="darkyellow",
+        hover_color="yellow",
         text_color="black"
     )
     skip_btn.pack(side=ctk.LEFT, padx=5)
@@ -915,7 +915,7 @@ def show_input_form():
     btn_img_add = ctk.CTkButton(img_frame, text="Добавить картинку", command=image_add_one, fg_color="green", hover_color="darkgreen")
     btn_img_add.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
-    btn_img_skip = ctk.CTkButton(img_frame, text="Пропустить эту", command=image_skip_one, fg_color="yellow", hover_color="darkyellow", text_color="black")
+    btn_img_skip = ctk.CTkButton(img_frame, text="Пропустить эту", command=image_skip_one, fg_color="yellow", hover_color="yellow", text_color="black")
     btn_img_skip.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
     btn_img_skip_all = ctk.CTkButton(img_frame, text="Пропустить все", command=image_skip_all, fg_color="red", hover_color="darkred")

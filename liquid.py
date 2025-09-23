@@ -193,7 +193,7 @@ def add_images_to_test_table(ws, films_data):
         text="Пропустить эту",
         command=skip_film,
         fg_color="yellow",
-        hover_color="darkyellow",
+        hover_color="yellow",
         text_color="black"
     )
     skip_btn.pack(side=ctk.LEFT, padx=5)
@@ -226,11 +226,11 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     """Заполняет переданный лист протоколом. НИЧЕГО не сохраняет на диск."""
     # Словарь для преобразования баллов в текст
     score_to_text = {
-        5: "Никаких изменений",
-        4: "Малозаметное стягивание пленки в обернутых пленках изделиях;",
-        3: "Небольшой зазор",
-        2: "Большой зазор/частичное отхождение кромки",
-        1: "Кромка отошла на протяжении 1/3 длины"
+    5: "Никаких изменений",
+    4: "Едва заметное изменение блеска и цвета",
+    3: "Незначительное изменение блеска или цвета",
+    2: "Четко различаемое изменение блеска или цвета/структура изменена незначительно",
+    1: "Четко различаемое изменение блеска или цвета/структура изменена значительно"
     }
 
     # Динамический расчет строк
@@ -246,7 +246,16 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 6
 
     # НАЗВАНИЕ ПРОТОКОЛА
-    film_numbers = ', '.join([film['sidak_num'] for film in films_data])
+    # Берём уникальные номера пленок, сохраняя порядок первого появления
+    seen = set()
+    unique_film_numbers = []
+    for film in films_data:
+        sidak = film['sidak_num']
+        if sidak not in seen:
+            unique_film_numbers.append(sidak)
+            seen.add(sidak)
+
+    film_numbers = ', '.join(unique_film_numbers)
     current_date = datetime.now().strftime('%d.%m.%Yг.')
     protocol_title_local = f'Протокол испытаний на {test_type.lower()} фасада в пленках {film_numbers} от {current_date}'
 
@@ -268,8 +277,16 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     create_cell(ws, f'D{current_row}', 'Толщина', bold=True, horizontal='center')
     current_row += 1
 
-    # Заполняем таблицу материалов
+    # Создаем список уникальных пленок на основе 'sidak_num'
+    unique_films = []
+    seen_sidak_nums = set()
     for film in films_data:
+        if film['sidak_num'] not in seen_sidak_nums:
+            unique_films.append(film)
+            seen_sidak_nums.add(film['sidak_num'])
+
+    # Теперь используем уникальный список для заполнения таблицы
+    for film in unique_films:
         create_cell(ws, f'A{current_row}', 'Пленка', horizontal='center')
         create_cell(ws, f'B{current_row}', film.get('sidak_num', ''), horizontal='center')
         create_cell(ws, f'C{current_row}', film.get('supplier_name', ''), horizontal='center')
@@ -296,8 +313,9 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     # 5. ПРИБОР
-    create_cell(ws, f'A{current_row}', '5. Прибор для измерения: Сушильный шкаф ЕС-4610.', bold=True)
+    create_cell(ws, f'A{current_row}', '5. Оборудование для проведения испытаний: Чашки Петри, Кофе (готовый к применению напиток, на основе зернового материала, охлаждённый до комнатной температуры); Масло; Ацетон; Вода; Чистая сухая ветошь; мыльный раствор; скотч малярный (для фиксации образца на плоскости).', bold=True, wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
+    ws.row_dimensions[current_row].height = 60
     current_row += 1
 
     # 6. УСЛОВИЯ
@@ -316,9 +334,9 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     # 8. МЕТОД ОПРЕДЕЛЕНИЯ
-    create_cell(ws, f'A{current_row}', '8. Метод определения:  ГОСТ 32289-2013 Приложение Г. Проведение испытаний: Образцы помещают в при температуре (20 + 5) °С и осматривают декоративную поверхность невооруженным глазом в целях обнаружения трещин на поверхности. Осмотр образцов производят под углом 20° - 30° к плоскости поверхности с расстояния 250 мм.', bold=False, wrap_text=True)
+    create_cell(ws, f'A{current_row}', '8. Метод определения:  ГОСТ 27627-88.Продолжительность воздействия: - Кофе: 1 час; Масло: 1 час; Ацетон: 10 минут.Расположить образец на ровную, твердую поверхность и зафиксировать малярным скотчем. Покрытие тщательно протереть сухой мягкой тканью. Выбранный для испытания реагент в объеме около 1 см.куб. вылить на образец и накрыть чашками Петри. По истечении времени испытания чашки Петри снять, оставшуюся жидкость осушить мягкой тканью, не допуская трения ее об испытуемую поверхность. Испытуемый образец выдержать, не накрывая, в течение 16-24 часов. После испытания и выдержки образцы сначала протирают тканью, смоченной в мыльном растворе, а затем водой и тщательно вытирают сухой тканью. По истечении 30 минут визуально оценить результат. ', bold=False, wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
-    ws.row_dimensions[current_row].height = 60
+    ws.row_dimensions[current_row].height = 150
     current_row += 2
 
     # ТАБЛИЦА №2 - МАТЕРИАЛЫ ДЛЯ ИЗГОТОВЛЕНИЯ ОБРАЗЦОВ
@@ -332,8 +350,8 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     create_cell(ws, f'D{current_row}', 'Пленка', bold=True, horizontal='center')
     current_row += 1
 
-    # Заполняем таблицу образцов (используем выбранные материал и клей, если переданы)
-    for i, film in enumerate(films_data, 1):
+    # Заполняем таблицу образцов (уникальные пленки)
+    for i, film in enumerate(unique_films, 1):
         create_cell(ws, f'A{current_row}', i, horizontal='center')
         create_cell(ws, f'B{current_row}', film.get('material', 'МДФ белый 19 мм  Кроношпан'), horizontal='center', wrap_text=True)
         create_cell(ws, f'C{current_row}', film.get('glue', 'Клей Perfotak 154/3'), horizontal='center', wrap_text=True)
@@ -357,8 +375,11 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
 
     # Заполняем таблицу испытаний
     for film in films_data:
-        create_cell(ws, f'A{current_row}', f"{film.get('sidak_num', '')}_", horizontal='center', wrap_text=True)
-        create_cell(ws, f'B{current_row}', film.get('test_type', ''), horizontal='center', wrap_text=True)
+        sidak = film.get('sidak_num', '')
+        liquid = film.get('liquid_type', '')
+        # Уникальный идентификатор строки: sidak + liquid
+        create_cell(ws, f'A{current_row}', f"{sidak}_{liquid}", horizontal='center', wrap_text=True)
+        create_cell(ws, f'B{current_row}', liquid, horizontal='center', wrap_text=True)  # ← ВАЖНО: liquid_type
         create_cell(ws, f'C{current_row}', '')
         create_cell(ws, f'D{current_row}', score_to_text.get(int(film.get('score', 0)), ''), horizontal='center', wrap_text=True)
         ws.row_dimensions[current_row].height = 200
@@ -372,10 +393,11 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     criteria_texts = [
-        'Нет изменений - Поверхность без изменений.',
-        'Небольшое пятно - Пятно, которое может быть удалено с помощью воды/чистящего средства.',
-        'Значительное пятно - Пятно, которое не может быть удалено с помощью чистящего средства.',
-        'Повреждение - Изменение цвета, глянца, вздутие, расслаивание, отслоение пленки от основы.',
+        '5 баллов – отсутствие видимых изменений;',
+        '4 балла – едва заметное изменение блеска и цвета;',
+        '3 балла – незначительное изменение блеска или цвета, при отсутствии изменения структуры испытываемого покрытия;',
+        '2 балла – четко различаемое изменение блеска или цвета; структура покрытия изменена незначительно;',
+        '1 балл – четко различаемые изменения блеска или цвета; структура испытываемого покрытия заметно изменена или разрушена.',
     ]
 
     for text in criteria_texts:
@@ -399,10 +421,18 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
 
     # Заполняем таблицу выводов
     for film in films_data:
-        create_cell(ws, f'A{current_row}', f"Пленка {film.get('sidak_num', '')}")
-        create_cell(ws, f'B{current_row}', film.get('liquid_type'))
-        create_cell(ws, f'C{current_row}', film.get('result'))
-        create_cell(ws, f'D{current_row}', "Оценка отсутствует")
+        score = int(film.get('score', 0))
+        ball_text = "баллов"
+        if score == 1:
+            ball_text = "балл"
+        elif 2 <= score <= 4:
+            ball_text = "балла"
+
+        create_cell(ws, f'A{current_row}', f"{film.get('sidak_num', '')} / {film.get('liquid_type', '')}", wrap_text=True)
+        create_cell(ws, f'B{current_row}', film.get('thickness', ''), horizontal='center', wrap_text=True)
+        create_cell(ws, f'C{current_row}', score_to_text.get(score, ''), horizontal='center', wrap_text=True)
+        create_cell(ws, f'D{current_row}', f"{score} {ball_text}", horizontal='center', wrap_text=True)
+        ws.row_dimensions[current_row].height = 45
         current_row += 1
 
     current_row += 2  # Отступ после выводов
@@ -472,10 +502,17 @@ def show_input_form():
         supplier = entry_supplier.get().strip()
         material = combo_material.get().strip()
         glue = combo_glue.get().strip()
-        exposure_time = combo_exposure_time.get().strip()
+        # Время выдержки определяется автоматически по типу жидкости
         liquid_type = combo_liquid_type.get().strip()
-        result = combo_result.get().strip()
-        
+        exposure_time_mapping = {
+            "Кофе": "1 час",
+            "Масло": "24 часа",
+            "Ацетон": "10 минут"
+        }
+        exposure_time = exposure_time_mapping.get(liquid_type, "1 час")
+        liquid_type = combo_liquid_type.get().strip()
+        score_str = combo_score.get().strip()
+
         # Проверка, что выбранный Sidak существует в базе
         if sidak not in all_sidak:
             messagebox.showwarning("Ошибка", "Выбранный номер Sidak не существует в базе данных.")
@@ -493,8 +530,23 @@ def show_input_form():
         if not liquid_type:
             messagebox.showwarning("Проверка", "Выберите тип жидкости")
             return None
-        if not result:
-            messagebox.showwarning("Проверка", "Выберите результат")
+        if not score_str:
+            messagebox.showwarning("Проверка", "Выберите оценку")
+            return None
+
+        # Получаем толщину
+        thickness_str = entry_thickness.get().strip().replace(',', '.')
+        try:
+            thickness = float(thickness_str)
+        except ValueError:
+            messagebox.showwarning("Проверка", "Толщина должна быть числом. Пример: 0.36")
+            return None
+
+        # Извлекаем число из строки "X баллов/балла/балл"
+        try:
+            score = int(score_str.split()[0])
+        except:
+            messagebox.showwarning("Ошибка", "Некорректный формат оценки")
             return None
 
         return {
@@ -503,17 +555,33 @@ def show_input_form():
             'material': material,
             'glue': glue,
             'exposure_time': exposure_time,
-            'liquid_type': liquid_type,
-            'result': result
+            'liquid_type': liquid_type,  # ← ДОБАВЛЕНО
+            'thickness': thickness,      # ← ДОБАВЛЕНО
+            'score': score
         }
-
+    def update_exposure_time(liquid):
+        mapping = {
+            "Кофе": "1 час",
+            "Масло": "24 часа",
+            "Ацетон": "10 минут"
+        }
+        time_value = mapping.get(liquid, "1 час")
+        combo_exposure_time.configure(state="normal")  # временно разблокируем
+        combo_exposure_time.set(time_value)
+        combo_exposure_time.configure(state="disabled")  # снова блокируем
     def add_film():
         film = validate_and_collect()
         if not film:
             return
         films_data.append(film)
         # в таблицу
-        tv.insert('', 'end', values=(film['sidak_num'], film['supplier_name'], film['exposure_time'], film['liquid_type'], film['result']))
+        tv.insert('', 'end', values=(
+            film['sidak_num'],
+            film['supplier_name'],
+            f"{film['thickness']:.2f}",
+            film['liquid_type'],
+            f"{film['score']} балл{'а' if 2<=film['score']<=4 else 'ов' if film['score']!=1 else ''}"
+        ))
         # очистка
         combo_sidak.set('')
         entry_supplier.delete(0, ctk.END)
@@ -554,10 +622,11 @@ def show_input_form():
         messagebox.showinfo("Готово", "Протокол сформирован в памяти. Теперь можно добавить картинки и сохранить файл.")
 
     # ---- Панель изображений (встроенная) ----
-    def find_target_row_by_film(sidak_num):
+    def find_target_row_by_film(sidak_num, liquid_type):
+        search_str = f"{sidak_num}_{liquid_type}"
         for row in range(1, ws.max_row + 1):
             cell_value = ws[f'A{row}'].value
-            if cell_value and sidak_num in str(cell_value) and "_" in str(cell_value):
+            if cell_value and search_str == str(cell_value).strip():
                 return row
         return None
 
@@ -586,7 +655,7 @@ def show_input_form():
             update_image_panel_state(False)
             return
         film = films_data[current_film_index]
-        target_row = find_target_row_by_film(film['sidak_num'])
+        target_row = find_target_row_by_film(film['sidak_num'], film['liquid_type'])
         if not target_row:
             print(f"⚠️ Не найдена строка для пленки {film['sidak_num']}")
             current_film_index += 1
@@ -708,7 +777,7 @@ def show_input_form():
         "Ведущий инженер-технолог Мкртчян А.Р.",
         ""
     ])
-    combo_participant.set("Ведущий инженер-технолог Мкртчян А.Р.")
+    combo_participant.set("")
     combo_participant.grid(row=2, column=1, padx=5, pady=2, sticky="ew")
 
     # Левая панель: ввод одной плёнки
@@ -853,20 +922,28 @@ def show_input_form():
     combo_glue.set("Клей Perfotak 154/3")
     combo_glue.grid(row=4, column=1, sticky="ew", padx=5, pady=5)
 
-    ctk.CTkLabel(left, text="Время выдержки").grid(row=5, column=0, sticky="w", padx=10, pady=5)
-    combo_exposure_time = ctk.CTkComboBox(left, values=["24 часа", "48 часов", "72 часа"])
-    combo_exposure_time.set("24 часа")
-    combo_exposure_time.grid(row=5, column=1, sticky="ew", padx=5, pady=5)
-
-    ctk.CTkLabel(left, text="Тип жидкости").grid(row=6, column=0, sticky="w", padx=10, pady=5)
-    combo_liquid_type = ctk.CTkComboBox(left, values=["Кофе", "Масло", "Ацетон"])
+    # === Тип жидкости (выше) ===
+    ctk.CTkLabel(left, text="Тип жидкости").grid(row=5, column=0, sticky="w", padx=10, pady=5)
+    combo_liquid_type = ctk.CTkComboBox(
+        left,
+        values=["Кофе", "Масло", "Ацетон"],
+        command=lambda choice: update_exposure_time(choice)  # ← Автообновление времени
+    )
     combo_liquid_type.set("Кофе")
-    combo_liquid_type.grid(row=6, column=1, sticky="ew", padx=5, pady=5)
+    combo_liquid_type.grid(row=5, column=1, sticky="ew", padx=5, pady=5)
 
-    ctk.CTkLabel(left, text="Результат").grid(row=7, column=0, sticky="w", padx=10, pady=5)
-    combo_result = ctk.CTkComboBox(left, values=["Нет изменений", "Небольшое пятно", "Значительное пятно", "Повреждение"])
-    combo_result.set("Нет изменений")
-    combo_result.grid(row=7, column=1, sticky="ew", padx=5, pady=5)
+    # === Время выдержки (ниже, только для отображения, редактировать нельзя) ===
+    ctk.CTkLabel(left, text="Время выдержки").grid(row=6, column=0, sticky="w", padx=10, pady=5)
+    combo_exposure_time = ctk.CTkComboBox(left, values=[])
+    combo_exposure_time.set("1 час")  # по умолчанию для "Кофе"
+    combo_exposure_time.configure(state="disabled")  # запрещаем ручной выбор
+    combo_exposure_time.grid(row=6, column=1, sticky="ew", padx=5, pady=5)
+
+    # === БАЛЛЫ (как в старом коде) ===
+    ctk.CTkLabel(left, text="Оценка (баллы)").grid(row=7, column=0, sticky="w", padx=10, pady=5)
+    combo_score = ctk.CTkComboBox(left, values=["5 баллов", "4 балла", "3 балла", "2 балла", "1 балл"])
+    combo_score.set("5 баллов")
+    combo_score.grid(row=7, column=1, sticky="ew", padx=5, pady=5)
 
 
     
@@ -889,7 +966,7 @@ def show_input_form():
     tv = ttk.Treeview(tv_frame, columns=('sidak', 'supplier', 'exposure_time', 'liquid_type', 'result'), show='headings')
     tv.heading('sidak', text='Sidak')
     tv.heading('supplier', text='Поставщик')
-    tv.heading('exposure_time', text='Время выдержки')
+    tv.heading('exposure_time', text='Толщина пленки')
     tv.heading('liquid_type', text='Тип жидкости')
     tv.heading('result', text='Результат')
 
@@ -919,7 +996,7 @@ def show_input_form():
     btn_img_add = ctk.CTkButton(img_frame, text="Добавить картинку", command=image_add_one, fg_color="green", hover_color="darkgreen")
     btn_img_add.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
-    btn_img_skip = ctk.CTkButton(img_frame, text="Пропустить эту", command=image_skip_one, fg_color="yellow", hover_color="darkyellow", text_color="black")
+    btn_img_skip = ctk.CTkButton(img_frame, text="Пропустить эту", command=image_skip_one, fg_color="yellow", hover_color="yellow", text_color="black")
     btn_img_skip.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
     btn_img_skip_all = ctk.CTkButton(img_frame, text="Пропустить все", command=image_skip_all, fg_color="red", hover_color="darkred")
