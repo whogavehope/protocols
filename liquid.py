@@ -7,16 +7,19 @@ import traceback
 import time
 from openpyxl.drawing.image import Image
 from openpyxl.worksheet.header_footer import HeaderFooter
-import tkinter as tk
-from tkinter import filedialog, ttk, messagebox
+import customtkinter as ctk
+from tkinter import filedialog, messagebox, ttk
 from openpyxl.drawing.image import Image
 from openpyxl.drawing.spreadsheet_drawing import AnchorMarker
 from openpyxl.utils.units import pixels_to_EMU
 from openpyxl.worksheet.pagebreak import RowBreak  # разрыв страниц
+import sqlite3
 
 # Глобальная переменная для имени протокола (для использования при сохранении)
 protocol_title = ""
-
+# Добавьте эти строки
+films_df = None
+all_sidak = []
 # ============================
 # УТИЛИТЫ ДЛЯ ОФОРМЛЕНИЯ
 # ============================
@@ -73,14 +76,14 @@ def add_images_to_test_table(ws, films_data):
             return
 
         film = films_data[current_film_index]
-        film_label.config(text=f"Пленка: {film['sidak_num']}")
+        film_label.configure(text=f"Пленка: {film['sidak_num']}")
 
         # Находим строку с текущей пленкой в таблице испытаний
         target_row = None
         for row in range(1, ws.max_row + 1):
             cell_value = ws[f'A{row}'].value
             # Более точный поиск - ищем точное совпадение с номером пленки
-            if cell_value and film['sidak_num'] in str(cell_value) and "_" in str(cell_value):
+            if cell_value and film['sidak_num'] in str(cell_value) and "09:30-17:30" in str(cell_value):
                 target_row = row
                 break
 
@@ -159,53 +162,54 @@ def add_images_to_test_table(ws, films_data):
         root.destroy()
 
     # Создаем GUI окно
-    root = tk.Tk()
+    root = ctk.CTkToplevel()
     root.title("Добавление изображений к пленкам")
     root.geometry("500x200")
 
     current_film_index = 0
 
     # Информация о процессе
-    tk.Label(root, text="Добавление изображений для каждой пленки",
+    ctk.CTkLabel(root, text="Добавление изображений для каждой пленки",
              font=("Arial", 12, "bold")).pack(pady=10)
 
-    film_label = tk.Label(root, text="", font=("Arial", 10))
+    film_label = ctk.CTkLabel(root, text="", font=("Arial", 10))
     film_label.pack(pady=5)
 
     # Кнопки
-    btn_frame = tk.Frame(root)
+    btn_frame = ctk.CTkFrame(root)
     btn_frame.pack(pady=20)
 
-    add_btn = tk.Button(
+    add_btn = ctk.CTkButton(
         btn_frame,
         text="Добавить картинку",
         command=add_image_for_selected_film,
-        bg="lightgreen",
-        width=15
+        fg_color="green",
+        hover_color="darkgreen"
     )
-    add_btn.pack(side=tk.LEFT, padx=5)
+    add_btn.pack(side=ctk.LEFT, padx=5)
 
-    skip_btn = tk.Button(
+    skip_btn = ctk.CTkButton(
         btn_frame,
         text="Пропустить эту",
         command=skip_film,
-        bg="lightyellow",
-        width=15
+        fg_color="yellow",
+        hover_color="darkyellow",
+        text_color="black"
     )
-    skip_btn.pack(side=tk.LEFT, padx=5)
+    skip_btn.pack(side=ctk.LEFT, padx=5)
 
-    skip_all_btn = tk.Button(
+    skip_all_btn = ctk.CTkButton(
         btn_frame,
         text="Пропустить все",
         command=skip_all,
-        bg="lightcoral",
-        width=15
+        fg_color="red",
+        hover_color="darkred"
     )
-    skip_all_btn.pack(side=tk.LEFT, padx=5)
+    skip_all_btn.pack(side=ctk.LEFT, padx=5)
 
     # Запускаем процесс для первой пленки
     if films_data:
-        film_label.config(text=f"Пленка: {films_data[0]['sidak_num']}")
+        film_label.configure(text=f"Пленка: {films_data[0]['sidak_num']}")
     else:
         messagebox.showinfo("Информация", "Нет данных о пленках")
         root.destroy()
@@ -223,10 +227,10 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     # Словарь для преобразования баллов в текст
     score_to_text = {
         5: "Никаких изменений",
-        4: "Едва заметное изменение блеска и цвета",
-        3: "Незначительное изменение блеска или цвета",
-        2: "Четко различаемое изменение блеска или цвета/структура изменена незначительно",
-        1: "Четко различаемое изменение блеска или цвета/структура изменена значительно"
+        4: "Малозаметное стягивание пленки в обернутых пленках изделиях;",
+        3: "Небольшой зазор",
+        2: "Большой зазор/частичное отхождение кромки",
+        1: "Кромка отошла на протяжении 1/3 длины"
     }
 
     # Динамический расчет строк
@@ -242,10 +246,9 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 6
 
     # НАЗВАНИЕ ПРОТОКОЛА
-    unique_film_numbers = sorted(list(set([film['sidak_num'] for film in films_data])))
-    film_numbers = ', '.join(unique_film_numbers)
+    film_numbers = ', '.join([film['sidak_num'] for film in films_data])
     current_date = datetime.now().strftime('%d.%m.%Yг.')
-    protocol_title_local = f'Протокол испытаний по определению стойкости поверхности фасада к воздействию жидкостей в пленках {film_numbers} от {current_date}'
+    protocol_title_local = f'Протокол испытаний на {test_type.lower()} фасада в пленках {film_numbers} от {current_date}'
 
     create_cell(ws, f'A{current_row}', protocol_title_local, bold=True, font_size=12, horizontal='center', wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
@@ -253,9 +256,9 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 2
 
     # 1. ЦЕЛЬ ПРОВЕДЕНИЯ ИСПЫТАНИЯ
-    create_cell(ws, f'A{current_row}', '1. Цель проведения испытания: определение стойкости неповреждённого декоративного и защитного покрытия к воздействию жидкостей, при комнатной температуре, в течении заданного времени в материалах:', bold=False, wrap_text=True)
+    create_cell(ws, f'A{current_row}', '1. Цель проведения испытания: оценить прочность покрытия при нагреве фасада в материалах:', bold=False, wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
-    ws.row_dimensions[current_row].height = 45
+    ws.row_dimensions[current_row].height = 30
     current_row += 1
 
     # Заголовок таблицы материалов
@@ -266,16 +269,7 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     # Заполняем таблицу материалов
-    # Создаем список уникальных пленок на основе 'sidak_num'
-    unique_films = []
-    seen_sidak_nums = set()
     for film in films_data:
-        if film['sidak_num'] not in seen_sidak_nums:
-            unique_films.append(film)
-            seen_sidak_nums.add(film['sidak_num'])
-
-    # Теперь используем уникальный список для заполнения таблицы
-    for film in unique_films:
         create_cell(ws, f'A{current_row}', 'Пленка', horizontal='center')
         create_cell(ws, f'B{current_row}', film.get('sidak_num', ''), horizontal='center')
         create_cell(ws, f'C{current_row}', film.get('supplier_name', ''), horizontal='center')
@@ -302,9 +296,8 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     # 5. ПРИБОР
-    create_cell(ws, f'A{current_row}', '5. Оборудование для проведения испытаний: Чашки Петри, Кофе (готовый к применению напиток, на основе зернового материала, охлаждённый до комнатной температуры); Масло; Ацетон; Вода; Чистая сухая ветошь; мыльный раствор; скотч малярный (для фиксации образца на плоскости).', bold=True, wrap_text=True)
+    create_cell(ws, f'A{current_row}', '5. Прибор для измерения: Сушильный шкаф ЕС-4610.', bold=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
-    ws.row_dimensions[current_row].height = 60
     current_row += 1
 
     # 6. УСЛОВИЯ
@@ -323,9 +316,9 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     # 8. МЕТОД ОПРЕДЕЛЕНИЯ
-    create_cell(ws, f'A{current_row}', '8. Метод определения:  ГОСТ 27627-88.Продолжительность воздействия: - Кофе: 1 час; Масло: 1 час; Ацетон: 10 минут.Расположить образец на ровную, твердую поверхность и зафиксировать малярным скотчем. Покрытие тщательно протереть сухой мягкой тканью. Выбранный для испытания реагент в объеме около 1 см.куб. вылить на образец и накрыть чашками Петри. По истечении времени испытания чашки Петри снять, оставшуюся жидкость осушить мягкой тканью, не допуская трения ее об испытуемую поверхность. Испытуемый образец выдержать, не накрывая, в течение 16-24 часов. После испытания и выдержки образцы сначала протирают тканью, смоченной в мыльном растворе, а затем водой и тщательно вытирают сухой тканью. По истечении 30 минут визуально оценить результат. ', bold=False, wrap_text=True)
+    create_cell(ws, f'A{current_row}', '8. Метод определения:  ГОСТ 32289-2013 Приложение Г. Проведение испытаний: Образцы помещают в при температуре (20 + 5) °С и осматривают декоративную поверхность невооруженным глазом в целях обнаружения трещин на поверхности. Осмотр образцов производят под углом 20° - 30° к плоскости поверхности с расстояния 250 мм.', bold=False, wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
-    ws.row_dimensions[current_row].height = 150
+    ws.row_dimensions[current_row].height = 60
     current_row += 2
 
     # ТАБЛИЦА №2 - МАТЕРИАЛЫ ДЛЯ ИЗГОТОВЛЕНИЯ ОБРАЗЦОВ
@@ -340,8 +333,7 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     # Заполняем таблицу образцов (используем выбранные материал и клей, если переданы)
-    # Теперь используем уникальный список для заполнения таблицы
-    for i, film in enumerate(unique_films, 1):
+    for i, film in enumerate(films_data, 1):
         create_cell(ws, f'A{current_row}', i, horizontal='center')
         create_cell(ws, f'B{current_row}', film.get('material', 'МДФ белый 19 мм  Кроношпан'), horizontal='center', wrap_text=True)
         create_cell(ws, f'C{current_row}', film.get('glue', 'Клей Perfotak 154/3'), horizontal='center', wrap_text=True)
@@ -354,9 +346,6 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     # ТАБЛИЦА №3 - ИСПЫТАНИЯ ОБРАЗЦОВ
     create_cell(ws, f'A{current_row}', 'Таблица №3 Испытания образцов', bold=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
-    # СОХРАНЯЕМ НАЧАЛЬНУЮ СТРОКУ ТАБЛИЦЫ №3 В ГЛОБАЛЬНУЮ ПЕРЕМЕННУЮ
-    global start_row_for_table_3
-    start_row_for_table_3 = current_row + 2
     current_row += 1
 
     create_cell(ws, f'A{current_row}', 'Номер пленки', bold=True, horizontal='center', wrap_text=True)
@@ -383,11 +372,10 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     criteria_texts = [
-        '5 баллов – отсутствие видимых изменений;',
-        '4 балла – едва заметное изменение блеска и цвета;',
-        '3 балла – незначительное изменение блеска или цвета, при отсутствии изменения структуры испытываемого покрытия;',
-        '2 балла – четко различаемое изменение блеска или цвета; структура покрытия изменена незначительно;',
-        '1 балл – четко различаемые изменения блеска или цвета; структура испытываемого покрытия заметно изменена или разрушена.',
+        'Нет изменений - Поверхность без изменений.',
+        'Небольшое пятно - Пятно, которое может быть удалено с помощью воды/чистящего средства.',
+        'Значительное пятно - Пятно, которое не может быть удалено с помощью чистящего средства.',
+        'Повреждение - Изменение цвета, глянца, вздутие, расслаивание, отслоение пленки от основы.',
     ]
 
     for text in criteria_texts:
@@ -403,28 +391,18 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     ws.merge_cells(f'A{current_row}:D{current_row}')
     current_row += 1
 
-    create_cell(ws, f'A{current_row}', '№ пленки/Испытание', bold=True, horizontal='center', wrap_text=True)
-    create_cell(ws, f'B{current_row}', 'Толщина', bold=True, horizontal='center')
+    create_cell(ws, f'A{current_row}', 'Материал', bold=True, horizontal='center')
+    create_cell(ws, f'B{current_row}', 'Тип жидкости', bold=True, horizontal='center')
     create_cell(ws, f'C{current_row}', 'Результат', bold=True, horizontal='center')
     create_cell(ws, f'D{current_row}', 'Оценка', bold=True, horizontal='center')
-    ws.row_dimensions[current_row].height = 30
     current_row += 1
 
     # Заполняем таблицу выводов
     for film in films_data:
-        score = int(film.get('score', 0))
-        ball_text = "баллов"
-        if score == 1:
-            ball_text = "балл"
-        elif 2 <= score <= 4:
-            ball_text = "балла"
-
-        create_cell(ws, f'A{current_row}', f"{film.get('sidak_num', '')} / {film.get('test_type', '')}", wrap_text=True)
-        create_cell(ws, f'B{current_row}', film.get('thickness', ''), horizontal='center', wrap_text=True)
-        # Результат (текст по баллам)
-        create_cell(ws, f'C{current_row}', score_to_text.get(score, ''),horizontal='center',wrap_text=True)
-        create_cell(ws, f'D{current_row}', f"{score} {ball_text}", horizontal='center', wrap_text=True)
-        ws.row_dimensions[current_row].height = 45
+        create_cell(ws, f'A{current_row}', f"Пленка {film.get('sidak_num', '')}")
+        create_cell(ws, f'B{current_row}', film.get('liquid_type'))
+        create_cell(ws, f'C{current_row}', film.get('result'))
+        create_cell(ws, f'D{current_row}', "Оценка отсутствует")
         current_row += 1
 
     current_row += 2  # Отступ после выводов
@@ -470,12 +448,7 @@ def create_protocol(films_data, output_filename):
     ws = wb.active
     ws.title = "Лист1"
     # Сохраняем title в глобальной переменной
-    protocol_title = build_protocol(
-        ws,
-        films_data,
-        author=combo_author.get(),
-        participant=combo_participant.get()
-    )
+    protocol_title = build_protocol(ws, films_data)
     wb.save(output_filename)
     print(f"✅ Протокол создан: {output_filename}")
     return wb, ws
@@ -486,6 +459,7 @@ def create_protocol(films_data, output_filename):
 # ============================
 
 def show_input_form():
+    global films_df, all_sidak
     films_data = []
     wb = None
     ws = None
@@ -494,12 +468,18 @@ def show_input_form():
     current_film_index = 0
 
     def validate_and_collect():
-        sidak = entry_sidak.get().strip()
+        sidak = combo_sidak.get().strip()
         supplier = entry_supplier.get().strip()
         material = combo_material.get().strip()
         glue = combo_glue.get().strip()
-        thick_raw = entry_thickness.get().strip().replace(',', '.')
-        score_str = combo_score.get().strip()
+        exposure_time = combo_exposure_time.get().strip()
+        liquid_type = combo_liquid_type.get().strip()
+        result = combo_result.get().strip()
+        
+        # Проверка, что выбранный Sidak существует в базе
+        if sidak not in all_sidak:
+            messagebox.showwarning("Ошибка", "Выбранный номер Sidak не существует в базе данных.")
+            return None
 
         if not sidak:
             messagebox.showwarning("Проверка", "Укажите Обозначение Sidak")
@@ -507,24 +487,24 @@ def show_input_form():
         if not supplier:
             messagebox.showwarning("Проверка", "Укажите Наименование у поставщика")
             return None
-        try:
-            thickness = float(thick_raw)
-        except ValueError:
-            messagebox.showwarning("Проверка", "Толщина должна быть числом. Пример: 0.36")
+        if not exposure_time:
+            messagebox.showwarning("Проверка", "Выберите время выдержки")
             return None
-        if not score_str:
-            messagebox.showwarning("Проверка", "Выберите оценку")
+        if not liquid_type:
+            messagebox.showwarning("Проверка", "Выберите тип жидкости")
             return None
-        score = int(score_str.split()[0])
+        if not result:
+            messagebox.showwarning("Проверка", "Выберите результат")
+            return None
 
         return {
             'sidak_num': sidak,
             'supplier_name': supplier,
             'material': material,
             'glue': glue,
-            'thickness': thickness,
-            'score': score,
-            'test_type': combo_test_type.get()
+            'exposure_time': exposure_time,
+            'liquid_type': liquid_type,
+            'result': result
         }
 
     def add_film():
@@ -533,9 +513,11 @@ def show_input_form():
             return
         films_data.append(film)
         # в таблицу
-        tv.insert('', 'end', values=(film['sidak_num'], film['supplier_name'], film['thickness'], film['score'], film['test_type']))
-
-        entry_sidak.focus_set()
+        tv.insert('', 'end', values=(film['sidak_num'], film['supplier_name'], film['exposure_time'], film['liquid_type'], film['result']))
+        # очистка
+        combo_sidak.set('')
+        entry_supplier.delete(0, ctk.END)
+        combo_sidak.focus_set()
 
     def delete_selected():
         sel = tv.selection()
@@ -568,10 +550,9 @@ def show_input_form():
         current_film_index = 0
         update_image_panel_state(enabled=True)
         update_current_film_label()
-        btn_save.config(state='normal')
+        btn_save.configure(state='normal')
         messagebox.showinfo("Готово", "Протокол сформирован в памяти. Теперь можно добавить картинки и сохранить файл.")
 
-    # ---- Панель изображений (встроенная) ----
     # ---- Панель изображений (встроенная) ----
     def find_target_row_by_film(sidak_num):
         for row in range(1, ws.max_row + 1):
@@ -582,18 +563,18 @@ def show_input_form():
 
     def update_current_film_label():
         if ws is None or not films_data:
-            lbl_current_film.config(text="Нет данных")
+            lbl_current_film.configure(text="Нет данных")
             return
         if current_film_index >= len(films_data):
-            lbl_current_film.config(text="Все плёнки обработаны")
+            lbl_current_film.configure(text="Все плёнки обработаны")
         else:
-            lbl_current_film.config(text=f"Текущая плёнка: {films_data[current_film_index]['sidak_num']}")
+            lbl_current_film.configure(text=f"Текущая плёнка: {films_data[current_film_index]['sidak_num']}")
 
     def update_image_panel_state(enabled: bool):
         state = 'normal' if enabled else 'disabled'
-        btn_img_add.config(state=state)
-        btn_img_skip.config(state=state)
-        btn_img_skip_all.config(state=state)
+        btn_img_add.configure(state=state)
+        btn_img_skip.configure(state=state)
+        btn_img_skip_all.configure(state=state)
 
     def image_add_one():
         nonlocal current_film_index
@@ -644,7 +625,6 @@ def show_input_form():
                 update_image_panel_state(False)
             update_current_film_label()
 
-
     def image_skip_one():
         nonlocal current_film_index
         current_film_index += 1
@@ -693,124 +673,267 @@ def show_input_form():
 
 
     # --- UI ---
-    root = tk.Tk()
-    root.title("Протокол испытаний поверхности на воздействие жидкостей — ввод данных")
+    ctk.set_appearance_mode("light")
+    ctk.set_default_color_theme("blue")
+
+    root = ctk.CTk()
+    root.title("Протокол испытания на воздействие жидкостей — ввод данных")
 
     # --- Новые выпадающие списки ---
-    top = tk.LabelFrame(root, text="Общие параметры", padx=8, pady=8)
+    top = ctk.CTkFrame(root, corner_radius=10)
     top.grid(row=0, column=0, columnspan=3, sticky="ew", padx=8, pady=(8,0))
+    top.grid_columnconfigure(1, weight=1)
 
+    ctk.CTkLabel(top, text="Вид испытания").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+    combo_test_type = ctk.CTkComboBox(top, values=[
+        "Нагрев",
+        "Воздействие кофе",
+        "Воздействие масла",
+        "Воздействие ацетона",
+    ])
+    combo_test_type.set("Воздействие жидкостей")
+    combo_test_type.grid(row=0, column=1, padx=5, pady=2, sticky="ew")
 
-
-    tk.Label(top, text="Автор").grid(row=1, column=0, sticky="w")
-    combo_author = ttk.Combobox(top, width=50, values=[
+    ctk.CTkLabel(top, text="Автор").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+    combo_author = ctk.CTkComboBox(top, values=[
         "Руководитель службы качества Камынин В.А.",
         "Специалист по качеству Павлова Н.А.",
         "Специалист по качеству Сидорова А.И.",
     ])
-    combo_author.current(0)  # по умолчанию "Камынин В.А."
-    combo_author.grid(row=1, column=1, padx=5, pady=2, sticky="w")
+    combo_author.set("Руководитель службы качества Камынин В.А.")
+    combo_author.grid(row=1, column=1, padx=5, pady=2, sticky="ew")
 
-    tk.Label(top, text="Участник").grid(row=2, column=0, sticky="w")
-    combo_participant = ttk.Combobox(top, width=50, values=[
+    ctk.CTkLabel(top, text="Участник").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+    combo_participant = ctk.CTkComboBox(top, values=[
         "Ведущий инженер-технолог Мкртчян А.Р.",
         ""
     ])
-    combo_participant.current(1)
-    combo_participant.grid(row=2, column=1, padx=5, pady=2, sticky="w")
+    combo_participant.set("Ведущий инженер-технолог Мкртчян А.Р.")
+    combo_participant.grid(row=2, column=1, padx=5, pady=2, sticky="ew")
 
     # Левая панель: ввод одной плёнки
-    left = tk.LabelFrame(root, text="Добавление плёнки", padx=8, pady=8)
-
+    left = ctk.CTkFrame(root, corner_radius=10)
     left.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
+    left.grid_columnconfigure(1, weight=1)
 
-    tk.Label(left, text="Обозначение Sidak").grid(row=0, column=0, sticky="w")
-    entry_sidak = tk.Entry(left, width=28); entry_sidak.grid(row=0, column=1, sticky="w")
+    import sqlite3
 
-    tk.Label(left, text="Поставщик (наименование)").grid(row=1, column=0, sticky="w")
-    entry_supplier = tk.Entry(left, width=28); entry_supplier.grid(row=1, column=1, sticky="w")
+    # Загружаем данные из базы
+    def load_films():
+        conn = sqlite3.connect("films.db")
+        cur = conn.cursor()
+        cur.execute("SELECT sidak_num, supplier_name, thickness FROM films ORDER BY sidak_num")
+        rows = cur.fetchall()
+        conn.close()
+        return rows
 
-    tk.Label(left, text="Листовой материал").grid(row=2, column=0, sticky="w")
-    combo_material = ttk.Combobox(left, width=35, values=[
+    films = load_films()
+    all_sidak = [r[0] for r in films]
+    # Глобальные переменные для данных
+    sidak_value = ctk.StringVar(value="")
+    ctk.CTkLabel(left, text="Обозначение Sidak").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+    def on_select_sidak(choice):
+        sidak = choice.strip()
+        conn = sqlite3.connect("films.db")
+        cur = conn.cursor()
+        cur.execute("SELECT supplier_name FROM films WHERE sidak_num = ?", (sidak,))
+        details = cur.fetchone()
+        conn.close()
+
+        if details:
+            entry_supplier.delete(0, ctk.END)
+            entry_supplier.insert(0, details[0])
+        else:
+            entry_supplier.delete(0, ctk.END)
+    # Вместо CTkComboBox используем CTkEntry для ввода
+    combo_sidak = ctk.CTkEntry(left)
+    combo_sidak.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+    
+    # Создаем скроллируемую рамку для выпадающего списка, но пока не размещаем ее
+    results_frame = ctk.CTkScrollableFrame(root, width=combo_sidak._current_width, height=200)
+    
+    # Глобальная переменная для отслеживания открытого состояния
+    global is_dropdown_open
+    is_dropdown_open = False
+    
+    # Глобальная переменная для хранения данных
+    global all_sidak_data
+    all_sidak_data = []
+
+    def select_from_list(sidak_num):
+        global is_dropdown_open
+        combo_sidak.delete(0, 'end')
+        combo_sidak.insert(0, sidak_num)
+        
+        # Очищаем и скрываем выпадающий список
+        results_frame.place_forget()
+        is_dropdown_open = False
+
+        # Заполняем остальные поля, как это делала on_select_sidak
+        try:
+            conn = sqlite3.connect("films.db")
+            cur = conn.cursor()
+            cur.execute("SELECT supplier_name, thickness FROM films WHERE sidak_num = ?", (sidak_num,))
+            details = cur.fetchone()
+            conn.close()
+            if details:
+                entry_supplier.delete(0, ctk.END)
+                entry_supplier.insert(0, details[0])
+                entry_thickness.delete(0, ctk.END)
+                entry_thickness.insert(0, str(details[1]))
+            else:
+                entry_supplier.delete(0, ctk.END)
+                entry_thickness.delete(0, ctk.END)
+        except sqlite3.Error as e:
+            messagebox.showerror("Ошибка", f"Не удалось подключиться к базе данных: {e}")
+            return
+
+    def filter_sidak(event=None):
+        global is_dropdown_open
+        text = combo_sidak.get().strip().lower()
+
+        # Очищаем выпадающий список
+        for widget in results_frame.winfo_children():
+            widget.destroy()
+
+        # Фильтруем данные из базы
+        try:
+            conn = sqlite3.connect("films.db")
+            cur = conn.cursor()
+            cur.execute("SELECT sidak_num FROM films WHERE lower(sidak_num) LIKE ? ORDER BY sidak_num", (f'%{text}%',))
+            filtered_sidak = [r[0] for r in cur.fetchall()]
+            conn.close()
+        except sqlite3.Error as e:
+            messagebox.showerror("Ошибка", f"Не удалось подключиться к базе данных: {e}")
+            return
+
+        if not filtered_sidak:
+            results_frame.place_forget()
+            is_dropdown_open = False
+            return
+
+        # Получаем координаты поля ввода
+        x_pos = combo_sidak.winfo_rootx() - root.winfo_rootx()
+        y_pos = combo_sidak.winfo_rooty() - root.winfo_rooty() + combo_sidak.winfo_height()
+
+        # Размещаем выпадающий список
+        results_frame.place(x=x_pos, y=y_pos)
+        is_dropdown_open = True
+        
+        for sidak in filtered_sidak:
+            btn = ctk.CTkButton(results_frame, text=sidak, command=lambda s=sidak: select_from_list(s))
+            btn.pack(fill="x", pady=2)
+
+
+    # Привязываем событие ввода к функции фильтрации
+    combo_sidak.bind("<KeyRelease>", filter_sidak)
+
+    ctk.CTkLabel(left, text="Поставщик").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+    entry_supplier = ctk.CTkEntry(left)
+    entry_supplier.grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+    # === Толщина ===
+    ctk.CTkLabel(left, text="Толщина пленки,мм:", font=("Arial", 12)).grid(row=2, column=0, sticky="w", padx=5, pady=5)
+    entry_thickness = ctk.CTkEntry(left)
+    entry_thickness.grid(row=2, column=1, sticky="ew", padx=5, pady=5)
+    ctk.CTkLabel(left, text="Листовой материал").grid(row=3, column=0, sticky="w", padx=10, pady=5)
+    combo_material = ctk.CTkComboBox(left, values=[
         "МДФ белый 19 мм  Кроношпан",
         "МДФ 16 мм  Кроношпан",
         "МДФ 19 мм  Egger",
     ])
-    combo_material.current(0); combo_material.grid(row=2, column=1, sticky="w")
+    combo_material.set("МДФ белый 19 мм  Кроношпан")
+    combo_material.grid(row=3, column=1, sticky="ew", padx=5, pady=5)
 
-    tk.Label(left, text="Клей").grid(row=3, column=0, sticky="w")
-    combo_glue = ttk.Combobox(left, width=35, values=[
+    ctk.CTkLabel(left, text="Клей").grid(row=4, column=0, sticky="w", padx=10, pady=5)
+    combo_glue = ctk.CTkComboBox(left, values=[
         "Клей Perfotak 154/3",
         "Клей Jowat 688.60",
         "Клей Henkel 701.20",
     ])
-    combo_glue.current(0); combo_glue.grid(row=3, column=1, sticky="w")
+    combo_glue.set("Клей Perfotak 154/3")
+    combo_glue.grid(row=4, column=1, sticky="ew", padx=5, pady=5)
 
-    tk.Label(left, text="Толщина пленки (напр. 0.36)").grid(row=4, column=0, sticky="w")
-    entry_thickness = tk.Entry(left, width=28); entry_thickness.grid(row=4, column=1, sticky="w")
+    ctk.CTkLabel(left, text="Время выдержки").grid(row=5, column=0, sticky="w", padx=10, pady=5)
+    combo_exposure_time = ctk.CTkComboBox(left, values=["24 часа", "48 часов", "72 часа"])
+    combo_exposure_time.set("24 часа")
+    combo_exposure_time.grid(row=5, column=1, sticky="ew", padx=5, pady=5)
 
-    tk.Label(left, text="Оценка (баллы)").grid(row=5, column=0, sticky="w")
-    combo_score = ttk.Combobox(left, width=26, values=["5 баллов", "4 балла", "3 балла", "2 балла", "1 балл"])
-    combo_score.current(0); combo_score.grid(row=5, column=1, sticky="w")
-    tk.Label(left, text="Вид испытания").grid(row=6, column=0, sticky="w")
-    combo_test_type = ttk.Combobox(left, width=26, values=[
-        "Нагрев - 8 часов",
-        "Кофе - 1 час",
-        "Масло - 24 часа",
-        "Ацетон - 10 минут",
-    ])
-    combo_test_type.current(1)
-    combo_test_type.grid(row=6, column=1, sticky="w")
-    btn_add = tk.Button(left, text="Добавить плёнку", command=add_film)
-    btn_add.grid(row=7, column=0, columnspan=2, pady=(8, 0), sticky="ew")
+    ctk.CTkLabel(left, text="Тип жидкости").grid(row=6, column=0, sticky="w", padx=10, pady=5)
+    combo_liquid_type = ctk.CTkComboBox(left, values=["Кофе", "Масло", "Ацетон"])
+    combo_liquid_type.set("Кофе")
+    combo_liquid_type.grid(row=6, column=1, sticky="ew", padx=5, pady=5)
 
-    # Центр: список добавленных плёнок
-    center = tk.LabelFrame(root, text="Список плёнок", padx=8, pady=8)
-    center.grid(row=1, column=1, sticky="nsew", padx=8, pady=8)
+    ctk.CTkLabel(left, text="Результат").grid(row=7, column=0, sticky="w", padx=10, pady=5)
+    combo_result = ctk.CTkComboBox(left, values=["Нет изменений", "Небольшое пятно", "Значительное пятно", "Повреждение"])
+    combo_result.set("Нет изменений")
+    combo_result.grid(row=7, column=1, sticky="ew", padx=5, pady=5)
 
-    cols = ("Sidak", "Поставщик", "Толщина", "Оценка", "Вид испытания")
-    tv = ttk.Treeview(center, columns=cols, show='headings', height=10)
-    for c, w in zip(cols, (100, 150, 80, 60, 100)):
-        tv.heading(c, text=c)
-        tv.column(c, width=w, anchor='center')
-    tv.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
-    btn_del = tk.Button(center, text="Удалить выбранную", command=delete_selected)
-    btn_del.grid(row=1, column=0, sticky="w", pady=(6,0))
+    
 
-    btn_build = tk.Button(center, text="Создать протокол (в памяти)", command=make_protocol_memory)
-    btn_build.grid(row=1, column=1, sticky="e", pady=(6,0))
 
-    # Правая панель: изображения + сохранение
-    right = tk.LabelFrame(root, text="Изображения и сохранение", padx=8, pady=8)
-    right.grid(row=1, column=2, sticky="nsew", padx=8, pady=8)
+    btn_add = ctk.CTkButton(left, text="Добавить в список", command=add_film)
+    btn_add.grid(row=9, column=0, columnspan=2, sticky="ew", padx=5, pady=(20, 5))
 
-    lbl_info = tk.Label(right, text="После создания протокола добавьте картинки к каждой плёнке.")
-    lbl_info.grid(row=0, column=0, columnspan=3, sticky="w")
+    btn_delete = ctk.CTkButton(left, text="Удалить выбранную", command=delete_selected, fg_color="red", hover_color="darkred")
+    btn_delete.grid(row=10, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
 
-    lbl_current_film = tk.Label(right, text="Текущая плёнка: —", font=("Arial", 10, "bold"))
-    lbl_current_film.grid(row=1, column=0, columnspan=3, sticky="w", pady=(6,6))
+    # Правая панель: таблица
+    right = ctk.CTkFrame(root, corner_radius=10)
+    right.grid(row=1, column=1, sticky="nsew", padx=8, pady=8, rowspan=3)
+    right.grid_columnconfigure(0, weight=1)
 
-    btn_img_add = tk.Button(right, text="Добавить картинку", command=image_add_one, state='disabled')
-    btn_img_add.grid(row=2, column=0, padx=2, pady=2, sticky="ew")
+    tv_frame = ctk.CTkFrame(right)
+    tv_frame.pack(fill="both", expand=True)
 
-    btn_img_skip = tk.Button(right, text="Пропустить эту", command=image_skip_one, state='disabled')
-    btn_img_skip.grid(row=2, column=1, padx=2, pady=2, sticky="ew")
+    tv = ttk.Treeview(tv_frame, columns=('sidak', 'supplier', 'exposure_time', 'liquid_type', 'result'), show='headings')
+    tv.heading('sidak', text='Sidak')
+    tv.heading('supplier', text='Поставщик')
+    tv.heading('exposure_time', text='Время выдержки')
+    tv.heading('liquid_type', text='Тип жидкости')
+    tv.heading('result', text='Результат')
 
-    btn_img_skip_all = tk.Button(right, text="Пропустить все", command=image_skip_all, state='disabled')
-    btn_img_skip_all.grid(row=2, column=2, padx=2, pady=2, sticky="ew")
+    tv.column('sidak', width=100)
+    tv.column('supplier', width=150)
+    tv.column('exposure_time', width=120)
+    tv.column('liquid_type', width=100)
+    tv.column('result', width=150)
+    tv.pack(fill="both", expand=True, padx=5, pady=5)
+    
+    # ---- Панель управления (встроена в главный UI) ----
+    control_panel = ctk.CTkFrame(root, corner_radius=10)
+    control_panel.grid(row=2, column=0, sticky="ew", padx=8, pady=8)
+    control_panel.grid_columnconfigure(0, weight=1)
 
-    btn_save = tk.Button(right, text="Сохранить файл…", command=save_protocol_to_file, state='disabled')
-    btn_save.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(12,0))
+    btn_create_protocol = ctk.CTkButton(control_panel, text="Сформировать протокол", command=make_protocol_memory)
+    btn_create_protocol.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
 
-    # Растяжение колонок/строк
-    root.columnconfigure(0, weight=0)
-    root.columnconfigure(1, weight=1)
-    root.columnconfigure(2, weight=0)
-    center.rowconfigure(0, weight=1)
-    center.columnconfigure(0, weight=1)
+    # ---- Панель для картинок (встроена) ----
+    img_frame = ctk.CTkFrame(root, corner_radius=10)
+    img_frame.grid(row=3, column=0, sticky="ew", padx=8, pady=8)
+    img_frame.grid_columnconfigure(0, weight=1)
+    
+    lbl_current_film = ctk.CTkLabel(img_frame, text="Нет данных", font=("Arial", 10, "bold"))
+    lbl_current_film.grid(row=0, column=0, columnspan=3, pady=5, padx=5)
 
-    entry_sidak.focus_set()
+    btn_img_add = ctk.CTkButton(img_frame, text="Добавить картинку", command=image_add_one, fg_color="green", hover_color="darkgreen")
+    btn_img_add.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+
+    btn_img_skip = ctk.CTkButton(img_frame, text="Пропустить эту", command=image_skip_one, fg_color="yellow", hover_color="darkyellow", text_color="black")
+    btn_img_skip.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+
+    btn_img_skip_all = ctk.CTkButton(img_frame, text="Пропустить все", command=image_skip_all, fg_color="red", hover_color="darkred")
+    btn_img_skip_all.grid(row=1, column=2, padx=5, pady=5, sticky="ew")
+    
+    btn_save = ctk.CTkButton(img_frame, text="Сохранить файл", command=save_protocol_to_file, state="disabled")
+    btn_save.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
+
+    update_image_panel_state(False)
+
+    root.grid_columnconfigure(1, weight=1)
+    root.grid_rowconfigure(1, weight=1)
+
+    combo_sidak.focus_set()
     root.mainloop()
 
 
@@ -855,5 +978,4 @@ if __name__ == "__main__":
     try:
         show_input_form()
     except Exception as e:
-        print(f"❌ Произошла ошибка: {e}")
-        print(traceback.format_exc())
+        messagebox.showerror("Критическая ошибка", f"Произошла непредвиденная ошибка: {e}\n\n{traceback.format_exc()}")
