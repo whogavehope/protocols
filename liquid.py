@@ -265,9 +265,9 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 2
 
     # 1. ЦЕЛЬ ПРОВЕДЕНИЯ ИСПЫТАНИЯ
-    create_cell(ws, f'A{current_row}', '1. Цель проведения испытания: оценить прочность покрытия при нагреве фасада в материалах:', bold=False, wrap_text=True)
+    create_cell(ws, f'A{current_row}', '1. Цель проведения испытания: определение стойкости неповреждённого декоративного и защитного покрытия к воздействию жидкостей, при комнатной температуре, в течении заданного времени в материалах:', bold=False, wrap_text=True)
     ws.merge_cells(f'A{current_row}:D{current_row}')
-    ws.row_dimensions[current_row].height = 30
+    ws.row_dimensions[current_row].height = 45
     current_row += 1
 
     # Заголовок таблицы материалов
@@ -414,7 +414,7 @@ def build_protocol(ws, films_data, test_type="Нагрев", author="", particip
     current_row += 1
 
     create_cell(ws, f'A{current_row}', 'Материал', bold=True, horizontal='center')
-    create_cell(ws, f'B{current_row}', 'Тип жидкости', bold=True, horizontal='center')
+    create_cell(ws, f'B{current_row}', 'Толщина,мм', bold=True, horizontal='center')
     create_cell(ws, f'C{current_row}', 'Результат', bold=True, horizontal='center')
     create_cell(ws, f'D{current_row}', 'Оценка', bold=True, horizontal='center')
     current_row += 1
