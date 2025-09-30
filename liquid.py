@@ -850,6 +850,38 @@ def show_input_form():
                 entry_supplier.insert(0, details[0])
                 entry_thickness.delete(0, ctk.END)
                 entry_thickness.insert(0, str(details[1]))
+                # ВСТАВЬ ЗДЕСЬ ВЕСЬ ЭТОТ БЛОК:
+                # Автоматически ставим оценку из базы в зависимости от типа жидкости
+                liquid_type = combo_liquid_type.get()
+                score_field = None
+                
+                if liquid_type == "Кофе":
+                    score_field = "coffee_score"
+                elif liquid_type == "Масло": 
+                    score_field = "oil_score"
+                if score_field:
+                    try:
+                        conn2 = sqlite3.connect("films.db")
+                        cur2 = conn2.cursor()
+                        cur2.execute(f"SELECT {score_field} FROM films WHERE sidak_num = ?", (sidak_num,))
+                        score_result = cur2.fetchone()
+                        conn2.close()
+                        
+                        if score_result and score_result[0] is not None:
+                            score = int(score_result[0])
+                            ball_text = "баллов"
+                            if score == 1:
+                                ball_text = "балл"
+                            elif 2 <= score <= 4:
+                                ball_text = "балла"
+                            score_text = f"{score} {ball_text}"
+                            combo_score.set(score_text)
+                        else:
+                            combo_score.set("")
+                    except:
+                        combo_score.set("")
+                else:
+                    combo_score.set("")
             else:
                 entry_supplier.delete(0, ctk.END)
                 entry_thickness.delete(0, ctk.END)
@@ -921,9 +953,14 @@ def show_input_form():
     ])
     combo_glue.set("Клей Perfotak 154/3")
     combo_glue.grid(row=4, column=1, sticky="ew", padx=5, pady=5)
-
+    def update_score_on_liquid_change(*args):
+        sidak = combo_sidak.get().strip()
+        if sidak:
+            select_from_list(sidak)  # перезаполняем оценку
     # === Тип жидкости (выше) ===
     ctk.CTkLabel(left, text="Тип жидкости").grid(row=5, column=0, sticky="w", padx=10, pady=5)
+    
+    
     combo_liquid_type = ctk.CTkComboBox(
         left,
         values=["Кофе", "Масло", "Ацетон"],
@@ -931,7 +968,7 @@ def show_input_form():
     )
     combo_liquid_type.set("Кофе")
     combo_liquid_type.grid(row=5, column=1, sticky="ew", padx=5, pady=5)
-
+    combo_liquid_type.bind("<<ComboboxSelected>>", update_score_on_liquid_change)
     # === Время выдержки (ниже, только для отображения, редактировать нельзя) ===
     ctk.CTkLabel(left, text="Время выдержки").grid(row=6, column=0, sticky="w", padx=10, pady=5)
     combo_exposure_time = ctk.CTkComboBox(left, values=[])

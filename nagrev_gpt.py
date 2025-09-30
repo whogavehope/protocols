@@ -14,7 +14,8 @@ from openpyxl.drawing.spreadsheet_drawing import AnchorMarker
 from openpyxl.utils.units import pixels_to_EMU
 from openpyxl.worksheet.pagebreak import RowBreak  # разрыв страниц
 import sqlite3
-
+# Глобальная переменная для выпадающего списка
+is_dropdown_open = False
 # Добавьте эти строки
 films_df = None
 all_sidak = []
@@ -730,7 +731,7 @@ def show_input_form():
     def load_films():
         conn = sqlite3.connect("films.db")
         cur = conn.cursor()
-        cur.execute("SELECT sidak_num, supplier_name, thickness FROM films ORDER BY sidak_num")
+        cur.execute("SELECT sidak_num, supplier_name, thickness, heating_score FROM films ORDER BY sidak_num")
         rows = cur.fetchall()
         conn.close()
         return rows
@@ -783,7 +784,7 @@ def show_input_form():
         try:
             conn = sqlite3.connect("films.db")
             cur = conn.cursor()
-            cur.execute("SELECT supplier_name, thickness FROM films WHERE sidak_num = ?", (sidak_num,))
+            cur.execute("SELECT supplier_name, thickness, heating_score FROM films WHERE sidak_num = ?", (sidak_num,))
             details = cur.fetchone()
             conn.close()
             if details:
@@ -791,6 +792,18 @@ def show_input_form():
                 entry_supplier.insert(0, details[0])
                 entry_thickness.delete(0, ctk.END)
                 entry_thickness.insert(0, str(details[1]))
+                heating_score = details[2]  # heating_score теперь третий элемент
+                if heating_score is not None:
+                    score = int(heating_score)
+                    ball_text = "баллов"
+                    if score == 1:
+                        ball_text = "балл"
+                    elif 2 <= score <= 4:
+                        ball_text = "балла"
+                    score_text = f"{score} {ball_text}"
+                    combo_score.set(score_text)
+                else:
+                    combo_score.set("")  # Очищаем если нет баллов
             else:
                 entry_supplier.delete(0, ctk.END)
                 entry_thickness.delete(0, ctk.END)

@@ -14,7 +14,7 @@ def get_all_films():
 def get_film_details(sidak):
     conn = sqlite3.connect("films.db")
     cur = conn.cursor()
-    cur.execute("SELECT supplier_name, thickness FROM films WHERE sidak_num = ?", (sidak,))
+    cur.execute("SELECT supplier_name, thickness, heating_score, coffee_score, oil_score, hardness FROM films WHERE sidak_num = ?", (sidak,))
     details = cur.fetchone()
     conn.close()
     return details
@@ -28,16 +28,32 @@ def add_film_window():
         except ValueError:
             messagebox.showerror("Ошибка", "Толщина должна быть числом")
             return
+        
+        # Получаем значения новых полей
+        heating_score = combo_heating.get()
+        heating_score = int(heating_score) if heating_score else None
+        
+        coffee_score = combo_coffee.get()
+        coffee_score = int(coffee_score) if coffee_score else None
+        
+        oil_score = combo_oil.get()
+        oil_score = int(oil_score) if oil_score else None
+        
+        hardness = combo_hardness.get()
+        hardness = hardness if hardness != "" else None
 
         if not sidak or not supplier:
-            messagebox.showerror("Ошибка", "Все поля обязательны")
+            messagebox.showerror("Ошибка", "Поля 'Номер Sidak' и 'Поставщик' обязательны")
             return
 
         conn = sqlite3.connect("films.db")
         cur = conn.cursor()
         try:
-            cur.execute("INSERT INTO films (sidak_num, supplier_name, thickness) VALUES (?, ?, ?)",
-                        (sidak, supplier, thickness))
+            cur.execute("""
+                INSERT INTO films 
+                (sidak_num, supplier_name, thickness, heating_score, coffee_score, oil_score, hardness) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (sidak, supplier, thickness, heating_score, coffee_score, oil_score, hardness))
             conn.commit()
             messagebox.showinfo("Успех", f"Плёнка {sidak} добавлена")
             win.destroy()
@@ -48,21 +64,50 @@ def add_film_window():
 
     win = ctk.CTkToplevel()
     win.title("Добавить плёнку")
+    win.geometry("400x500")
 
-    ctk.CTkLabel(win, text="Номер Sidak").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+    # Список вариантов для полей
+    score_options = ["", "1", "2", "3", "4", "5"]
+    hardness_options = ["", "5B", "4B", "3B", "2B", "B", "HB", "F", "H", "2H", "3H", "4H", "5H"]
+
+    row = 0
+    ctk.CTkLabel(win, text="Номер Sidak").grid(row=row, column=0, sticky="w", padx=10, pady=5)
     entry_sidak = ctk.CTkEntry(win, width=300)
-    entry_sidak.grid(row=0, column=1, padx=5, pady=5)
-
-    ctk.CTkLabel(win, text="Поставщик").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+    entry_sidak.grid(row=row, column=1, padx=5, pady=5)
+    
+    row += 1
+    ctk.CTkLabel(win, text="Поставщик").grid(row=row, column=0, sticky="w", padx=10, pady=5)
     entry_supplier = ctk.CTkEntry(win, width=300)
-    entry_supplier.grid(row=1, column=1, padx=5, pady=5)
-
-    ctk.CTkLabel(win, text="Толщина").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+    entry_supplier.grid(row=row, column=1, padx=5, pady=5)
+    
+    row += 1
+    ctk.CTkLabel(win, text="Толщина").grid(row=row, column=0, sticky="w", padx=10, pady=5)
     entry_thickness = ctk.CTkEntry(win, width=300)
-    entry_thickness.grid(row=2, column=1, padx=5, pady=5)
-
-    ctk.CTkButton(win, text="Сохранить", command=save_film, fg_color="green", hover_color="darkgreen").grid(row=3, columnspan=2, pady=10)
-
+    entry_thickness.grid(row=row, column=1, padx=5, pady=5)
+    
+    row += 1
+    ctk.CTkLabel(win, text="Нагрев баллы").grid(row=row, column=0, sticky="w", padx=10, pady=5)
+    combo_heating = ctk.CTkComboBox(win, values=score_options, width=300)
+    combo_heating.grid(row=row, column=1, padx=5, pady=5)
+    
+    row += 1
+    ctk.CTkLabel(win, text="Кофе баллы").grid(row=row, column=0, sticky="w", padx=10, pady=5)
+    combo_coffee = ctk.CTkComboBox(win, values=score_options, width=300)
+    combo_coffee.grid(row=row, column=1, padx=5, pady=5)
+    
+    row += 1
+    ctk.CTkLabel(win, text="Масло баллы").grid(row=row, column=0, sticky="w", padx=10, pady=5)
+    combo_oil = ctk.CTkComboBox(win, values=score_options, width=300)
+    combo_oil.grid(row=row, column=1, padx=5, pady=5)
+    
+    row += 1
+    ctk.CTkLabel(win, text="Твердость").grid(row=row, column=0, sticky="w", padx=10, pady=5)
+    combo_hardness = ctk.CTkComboBox(win, values=hardness_options, width=300)
+    combo_hardness.grid(row=row, column=1, padx=5, pady=5)
+    
+    row += 1
+    ctk.CTkButton(win, text="Сохранить", command=save_film, fg_color="green", hover_color="darkgreen").grid(row=row, columnspan=2, pady=20)
+    
 def delete_film_window():
     def delete_film():
         selected_film = entry_sidak.get().strip()
@@ -129,6 +174,12 @@ def import_from_excel():
             sidak_raw = row.iloc[0]
             supplier_raw = row.iloc[3]
             thickness_raw = row.iloc[10]
+            
+            # Новые поля из соответствующих столбцов
+            heating_score_raw = row.iloc[11]  # 12-й столбец (индекс 11)
+            coffee_score_raw = row.iloc[12]   # 13-й столбец (индекс 12)
+            oil_score_raw = row.iloc[13]      # 14-й столбец (индекс 13)
+            hardness_raw = row.iloc[9]        # 10-й столбец (индекс 9) - hardness
 
             if pd.isna(sidak_raw) or pd.isna(supplier_raw) or pd.isna(thickness_raw):
                 skipped_count += 1
@@ -138,6 +189,36 @@ def import_from_excel():
             supplier = str(supplier_raw).strip()
             thickness_str = str(thickness_raw).strip().replace(",", ".")
             
+            # Обработка новых полей
+            heating_score = None
+            if not pd.isna(heating_score_raw):
+                try:
+                    heating_score = int(float(heating_score_raw))
+                except (ValueError, TypeError):
+                    heating_score = None
+            
+            coffee_score = None
+            if not pd.isna(coffee_score_raw):
+                try:
+                    coffee_score = int(float(coffee_score_raw))
+                except (ValueError, TypeError):
+                    coffee_score = None
+            
+            oil_score = None
+            if not pd.isna(oil_score_raw):
+                try:
+                    oil_score = int(float(oil_score_raw))
+                except (ValueError, TypeError):
+                    oil_score = None
+            
+            hardness = None
+            if not pd.isna(hardness_raw):
+                hardness_str = str(hardness_raw).strip().upper()
+                # Проверяем, что значение находится в допустимом списке
+                valid_hardness = ['5B', '4B', '3B', '2B', 'B', 'HB', 'F', 'H', '2H', '3H', '4H', '5H']
+                if hardness_str in valid_hardness:
+                    hardness = hardness_str
+
             try:
                 thickness = float(thickness_str)
             except ValueError:
@@ -148,12 +229,23 @@ def import_from_excel():
             exists = cur.fetchone()
 
             if exists:
-                cur.execute("UPDATE films SET supplier_name = ?, thickness = ? WHERE sidak_num = ?", 
-                            (supplier, thickness, sidak))
+                cur.execute("""
+                    UPDATE films SET 
+                    supplier_name = ?, 
+                    thickness = ?,
+                    heating_score = ?,
+                    coffee_score = ?,
+                    oil_score = ?,
+                    hardness = ?
+                    WHERE sidak_num = ?
+                """, (supplier, thickness, heating_score, coffee_score, oil_score, hardness, sidak))
                 updated_count += 1
             else:
-                cur.execute("INSERT INTO films (sidak_num, supplier_name, thickness) VALUES (?, ?, ?)",
-                            (sidak, supplier, thickness))
+                cur.execute("""
+                    INSERT INTO films 
+                    (sidak_num, supplier_name, thickness, heating_score, coffee_score, oil_score, hardness) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (sidak, supplier, thickness, heating_score, coffee_score, oil_score, hardness))
                 imported_count += 1
         
         conn.commit()
@@ -176,9 +268,19 @@ def edit_film_window():
                 entry_edit_supplier.insert(0, details[0])
                 entry_edit_thickness.delete(0, ctk.END)
                 entry_edit_thickness.insert(0, details[1])
+                
+                # Заполняем новые поля
+                combo_edit_heating.set(str(details[2]) if details[2] is not None else "")
+                combo_edit_coffee.set(str(details[3]) if details[3] is not None else "")
+                combo_edit_oil.set(str(details[4]) if details[4] is not None else "")
+                combo_edit_hardness.set(details[5] if details[5] is not None else "")
             else:
                 entry_edit_supplier.delete(0, ctk.END)
                 entry_edit_thickness.delete(0, ctk.END)
+                combo_edit_heating.set("")
+                combo_edit_coffee.set("")
+                combo_edit_oil.set("")
+                combo_edit_hardness.set("")
 
     def update_film():
         sidak = entry_sidak.get().strip()
@@ -188,6 +290,19 @@ def edit_film_window():
         except ValueError:
             messagebox.showerror("Ошибка", "Толщина должна быть числом")
             return
+        
+        # Получаем значения новых полей
+        heating_score = combo_edit_heating.get()
+        heating_score = int(heating_score) if heating_score else None
+        
+        coffee_score = combo_edit_coffee.get()
+        coffee_score = int(coffee_score) if coffee_score else None
+        
+        oil_score = combo_edit_oil.get()
+        oil_score = int(oil_score) if oil_score else None
+        
+        hardness = combo_edit_hardness.get()
+        hardness = hardness if hardness != "" else None
 
         if not sidak:
             messagebox.showerror("Ошибка", "Выберите плёнку для редактирования")
@@ -204,9 +319,12 @@ def edit_film_window():
                 messagebox.showerror("Ошибка", f"Плёнка с номером {sidak} не найдена в базе данных")
                 return
 
-            # Обновляем, если существует
-            cur.execute("UPDATE films SET supplier_name = ?, thickness = ? WHERE sidak_num = ?",
-                        (supplier, thickness, sidak))
+            # Обновляем все поля
+            cur.execute("""
+                UPDATE films SET supplier_name = ?, thickness = ?, heating_score = ?, 
+                coffee_score = ?, oil_score = ?, hardness = ? 
+                WHERE sidak_num = ?
+            """, (supplier, thickness, heating_score, coffee_score, oil_score, hardness, sidak))
             conn.commit()
             messagebox.showinfo("Успех", f"Данные для плёнки {sidak} обновлены")
             win.destroy()
@@ -214,6 +332,7 @@ def edit_film_window():
             messagebox.showerror("Ошибка", f"Произошла ошибка: {e}")
         finally:
             conn.close()
+
     def check_film_exists(event=None):
         sidak = entry_sidak.get().strip()
         if not sidak:
@@ -230,15 +349,20 @@ def edit_film_window():
             btn_save.configure(state="normal")
         else:
             btn_save.configure(state="disabled")
+
     win = ctk.CTkToplevel()
     win.title("Редактировать плёнку")
-    win.geometry("400x350")
+    win.geometry("400x550")
+
+    # Список вариантов для полей
+    score_options = ["", "1", "2", "3", "4", "5"]
+    hardness_options = ["", "5B", "4B", "3B", "2B", "B", "HB", "F", "H", "2H", "3H", "4H", "5H"]
 
     ctk.CTkLabel(win, text="Введите или выберите номер Sidak").place(x=50, y=20)
 
     def on_film_selected_and_check(sidak_num):
-        on_film_selected(sidak_num)        # заполняем поля
-        check_film_exists()                # проверяем существование и активируем кнопку
+        on_film_selected(sidak_num)
+        check_film_exists()
 
     entry_sidak, results_frame = create_filterable_sidak_selector(
         parent=win,
@@ -248,20 +372,41 @@ def edit_film_window():
         on_select_callback=on_film_selected_and_check
     )
 
-    ctk.CTkLabel(win, text="Поставщик").place(x=50, y=120)
+    y_pos = 120
+    ctk.CTkLabel(win, text="Поставщик").place(x=50, y=y_pos)
     entry_edit_supplier = ctk.CTkEntry(win, width=300)
-    entry_edit_supplier.place(x=50, y=150)
+    entry_edit_supplier.place(x=50, y=y_pos + 30)
 
-    ctk.CTkLabel(win, text="Толщина").place(x=50, y=190)
+    y_pos += 70
+    ctk.CTkLabel(win, text="Толщина").place(x=50, y=y_pos)
     entry_edit_thickness = ctk.CTkEntry(win, width=300)
-    entry_edit_thickness.place(x=50, y=220)
+    entry_edit_thickness.place(x=50, y=y_pos + 30)
 
-    btn_save = ctk.CTkButton(win, text="Сохранить изменения", command=update_film, fg_color="blue", hover_color="darkblue", state="disabled")
-    btn_save.place(x=100, y=270)
+    y_pos += 70
+    ctk.CTkLabel(win, text="Нагрев баллы").place(x=50, y=y_pos)
+    combo_edit_heating = ctk.CTkComboBox(win, values=score_options, width=300)
+    combo_edit_heating.place(x=50, y=y_pos + 30)
 
-    # Привязываем проверку к изменению поля ввода
+    y_pos += 70
+    ctk.CTkLabel(win, text="Кофе баллы").place(x=50, y=y_pos)
+    combo_edit_coffee = ctk.CTkComboBox(win, values=score_options, width=300)
+    combo_edit_coffee.place(x=50, y=y_pos + 30)
+
+    y_pos += 70
+    ctk.CTkLabel(win, text="Масло баллы").place(x=50, y=y_pos)
+    combo_edit_oil = ctk.CTkComboBox(win, values=score_options, width=300)
+    combo_edit_oil.place(x=50, y=y_pos + 30)
+
+    y_pos += 70
+    ctk.CTkLabel(win, text="Твердость").place(x=50, y=y_pos)
+    combo_edit_hardness = ctk.CTkComboBox(win, values=hardness_options, width=300)
+    combo_edit_hardness.place(x=50, y=y_pos + 30)
+
+    btn_save = ctk.CTkButton(win, text="Сохранить изменения", command=update_film, 
+                           fg_color="blue", hover_color="darkblue", state="disabled")
+    btn_save.place(x=100, y=y_pos + 70)
+
     entry_sidak.bind("<KeyRelease>", check_film_exists)
-    # Проверяем при открытии окна
     check_film_exists()
 
     win.mainloop()
@@ -336,3 +481,6 @@ def create_filterable_sidak_selector(parent, initial_x, initial_y, width, on_sel
     entry_sidak.bind("<KeyRelease>", filter_sidak)
 
     return entry_sidak, results_frame
+
+
+
