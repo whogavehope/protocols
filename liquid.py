@@ -72,7 +72,7 @@ def add_images_to_test_table(ws, films_data):
 
         if current_film_index >= len(films_data):
             messagebox.showinfo("Завершено", "Все картинки добавлены!")
-            root.destroy()
+            root.withdraw()
             return
 
         film = films_data[current_film_index]
@@ -146,7 +146,7 @@ def add_images_to_test_table(ws, films_data):
             add_image_for_selected_film()
         else:
             messagebox.showinfo("Завершено", "Все картинки добавлены!")
-            root.destroy()
+            root.withdraw()
 
     def skip_film():
         nonlocal current_film_index
@@ -155,11 +155,11 @@ def add_images_to_test_table(ws, films_data):
             add_image_for_selected_film()
         else:
             messagebox.showinfo("Завершено", "Обработка завершена!")
-            root.destroy()
+            root.withdraw()
 
     def skip_all():
         messagebox.showinfo("Завершено", "Добавление картинок пропущено!")
-        root.destroy()
+        root.withdraw()
 
     # Создаем GUI окно
     root = ctk.CTkToplevel()
@@ -212,7 +212,7 @@ def add_images_to_test_table(ws, films_data):
         film_label.configure(text=f"Пленка: {films_data[0]['sidak_num']}")
     else:
         messagebox.showinfo("Информация", "Нет данных о пленках")
-        root.destroy()
+        root.withdraw()
         return
 
     root.mainloop()
@@ -583,7 +583,8 @@ def show_input_form():
             f"{film['score']} балл{'а' if 2<=film['score']<=4 else 'ов' if film['score']!=1 else ''}"
         ))
         # очистка
-        combo_sidak.set('')
+        combo_sidak.delete(0, ctk.END)
+
         entry_supplier.delete(0, ctk.END)
         combo_sidak.focus_set()
 

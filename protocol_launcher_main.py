@@ -47,7 +47,7 @@ def launch_selected_protocol():
     if selected not in PROTOCOLS:
         messagebox.showwarning("Внимание", "Выберите протокол")
         return
-    root.destroy()
+    root.withdraw()
     PROTOCOLS[selected]()
 
 def launch_add_film():
@@ -144,7 +144,7 @@ btn_edit.pack(pady=5)
 def on_closing():
     cancel_all_remaining_after()
     root.quit()
-    root.destroy()
+    root.withdraw()
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
