@@ -964,11 +964,11 @@ def show_input_form():
     combo_liquid_type = ctk.CTkComboBox(
         left,
         values=["Кофе", "Масло", "Ацетон"],
-        command=lambda choice: (update_exposure_time(choice), update_score_on_liquid_change())  # ← Автообновление времени
+        command=lambda choice: update_exposure_time(choice)  # ← Автообновление времени
     )
     combo_liquid_type.set("Кофе")
     combo_liquid_type.grid(row=5, column=1, sticky="ew", padx=5, pady=5)
-    
+    combo_liquid_type.bind("<<ComboboxSelected>>", update_score_on_liquid_change)
     # === Время выдержки (ниже, только для отображения, редактировать нельзя) ===
     ctk.CTkLabel(left, text="Время выдержки").grid(row=6, column=0, sticky="w", padx=10, pady=5)
     combo_exposure_time = ctk.CTkComboBox(left, values=[])
