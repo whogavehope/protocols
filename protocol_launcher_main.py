@@ -1,3 +1,4 @@
+#protocol_launcher_main.py
 import customtkinter as ctk
 from tkinter import messagebox
 from nagrev_gpt import show_input_form as show_nagrev_protocol
@@ -77,7 +78,7 @@ _original_after_cancel = root.after_cancel
 
 # ✅ Правильно: self приходит из root.after(...)
 root.after = lambda *args: patched_after(*args)
-root.after_cancel = lambda after_id: patched_after_cancel(*args)  # ← тоже без root!
+root.after_cancel = lambda after_id: patched_after_cancel(root, after_id)  # ← тоже без root!
 
 # =========================================================
 

@@ -19,6 +19,129 @@ def get_film_details(sidak):
     conn.close()
     return details
 
+# --- Начало функции импорта ---
+def import_from_excel():
+    try:
+        # Указываем, что первая строка - это заголовки (header=0)
+        df = pd.read_excel("Список пленок и толщин.xlsx", sheet_name="Перечень пленок", header=0)
+        
+        conn = sqlite3.connect("films.db")
+        cur = conn.cursor()
+        
+        imported_count = 0
+        updated_count = 0
+        skipped_count = 0
+        
+        for index, row in df.iterrows():
+            # 1. Проверка на наличие значения 'ДА' в 16-й колонке (индекс 15)
+            status = str(row.iloc[15]).strip().upper()
+            if status != "ДА":
+                skipped_count += 1
+                continue
+                
+            sidak_raw = row.iloc[0]
+            supplier_raw = row.iloc[3]
+            thickness_raw = row.iloc[10]
+            
+            # Новые поля из соответствующих столбцов
+            heating_score_raw = row.iloc[11]  # 12-й столбец (индекс 11)
+            coffee_score_raw = row.iloc[12]  # 13-й столбец (индекс 12)
+            oil_score_raw = row.iloc[13]     # 14-й столбец (индекс 13)
+            # Твердость теперь из 17-го столбца (индекс 16)
+            hardness_raw = row.iloc[16]      # 17-й столбец (индекс 16) - hardness
+
+            if pd.isna(sidak_raw) or pd.isna(supplier_raw) or pd.isna(thickness_raw):
+                skipped_count += 1
+                continue
+            
+            sidak = str(sidak_raw).strip()
+            supplier = str(supplier_raw).strip()
+            thickness_str = str(thickness_raw).strip().replace(",", ".")
+            
+            # Обработка scores (оценки)
+            heating_score = None
+            if not pd.isna(heating_score_raw):
+                try:
+                    heating_score = int(float(heating_score_raw))
+                except (ValueError, TypeError):
+                    heating_score = None
+            
+            coffee_score = None
+            if not pd.isna(coffee_score_raw):
+                try:
+                    coffee_score = int(float(coffee_score_raw))
+                except (ValueError, TypeError):
+                    coffee_score = None
+            
+            oil_score = None
+            if not pd.isna(oil_score_raw):
+                try:
+                    oil_score = int(float(oil_score_raw))
+                except (ValueError, TypeError):
+                    oil_score = None
+            
+            # ИЗМЕНЕНО: Устойчивая обработка hardness (только цифры от 1 до 5)
+            hardness = None
+            if not pd.isna(hardness_raw):
+                hardness_str = str(hardness_raw).strip() 
+                
+                # Попытка очистить от .0, если это число с плавающей точкой из Excel (например, 3.0)
+                if hardness_str.endswith(".0"):
+                    hardness_str = hardness_str[:-2]
+                
+                if hardness_str.isdigit():
+                    try:
+                        hardness_int = int(hardness_str)
+                        if 1 <= hardness_int <= 5:
+                            hardness = hardness_str  # Сохраняем как строку '1'...'5'
+                    except ValueError:
+                        hardness = None
+
+            try:
+                thickness = float(thickness_str)
+            except ValueError:
+                skipped_count += 1
+                continue
+
+            # Проверка наличия записи в базе данных
+            cur.execute("SELECT * FROM films WHERE sidak_num = ?", (sidak,))
+            exists = cur.fetchone()
+
+            if exists:
+                # Обновление существующей записи
+                cur.execute("""
+                    UPDATE films SET 
+                    supplier_name = ?, 
+                    thickness = ?,
+                    heating_score = ?,
+                    coffee_score = ?,
+                    oil_score = ?,
+                    hardness = ?
+                    WHERE sidak_num = ?
+                """, (supplier, thickness, heating_score, coffee_score, oil_score, hardness, sidak))
+                updated_count += 1
+            else:
+                # Вставка новой записи
+                cur.execute("""
+                    INSERT INTO films 
+                    (sidak_num, supplier_name, thickness, heating_score, coffee_score, oil_score, hardness) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (sidak, supplier, thickness, heating_score, coffee_score, oil_score, hardness))
+                imported_count += 1
+        
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Импорт завершен", 
+                            f"Импортировано новых плёнок: {imported_count}\n"
+                            f"Обновлено существующих плёнок: {updated_count}\n"
+                            f"Пропущено некорректных или неактуальных строк: {skipped_count}")
+        
+    except FileNotFoundError:
+        messagebox.showerror("Ошибка", "Файл 'Список пленок и толщин.xlsx' не найден.")
+    except Exception as e:
+        messagebox.showerror("Ошибка", f"Произошла ошибка при импорте: {e}")
+# --- Конец функции импорта ---
+
 def add_film_window():
     def save_film():
         sidak = entry_sidak.get().strip()
@@ -40,6 +163,7 @@ def add_film_window():
         oil_score = int(oil_score) if oil_score else None
         
         hardness = combo_hardness.get()
+        # Значение hardness — это либо строка "1"-"5", либо пустая строка, преобразуем в None
         hardness = hardness if hardness != "" else None
 
         if not sidak or not supplier:
@@ -66,9 +190,9 @@ def add_film_window():
     win.title("Добавить плёнку")
     win.geometry("400x500")
 
-    # Список вариантов для полей
+    # ИЗМЕНЕНО: Обновление списка для Твердости
     score_options = ["", "1", "2", "3", "4", "5"]
-    hardness_options = ["", "5B", "4B", "3B", "2B", "B", "HB", "F", "H", "2H", "3H", "4H", "5H"]
+    hardness_options = ["", "1", "2", "3", "4", "5"]
 
     row = 0
     ctk.CTkLabel(win, text="Номер Sidak").grid(row=row, column=0, sticky="w", padx=10, pady=5)
@@ -143,121 +267,12 @@ def delete_film_window():
         initial_x=50,
         initial_y=60,
         width=300,
-        on_select_callback=None  # не нужно ничего делать при выборе, кроме заполнения поля
+        on_select_callback=None
     )
 
     btn_delete = ctk.CTkButton(win, text="Удалить", command=delete_film, fg_color="red", hover_color="darkred")
-    btn_delete.place(x=100, y=250)  # или ниже, например y=270  # отступ снизу, чтобы кнопка не перекрывалась выпадающим списком
+    btn_delete.place(x=100, y=250)
 
-    win.mainloop()
-
-def import_from_excel():
-    try:
-        # Указываем, что первая строка - это заголовки (header=0)
-        df = pd.read_excel("Список пленок и толщин.xlsx", sheet_name="Перечень пленок", header=0)
-        
-        conn = sqlite3.connect("films.db")
-        cur = conn.cursor()
-        
-        imported_count = 0
-        updated_count = 0
-        skipped_count = 0
-        
-        for index, row in df.iterrows():
-            # Добавлена проверка на наличие значения 'ДА' в 16-й колонке (индекс 15)
-            # Приводим к строке и верхнему регистру, чтобы избежать ошибок
-            status = str(row.iloc[15]).strip().upper()
-            if status != "ДА":
-                skipped_count += 1
-                continue
-                
-            sidak_raw = row.iloc[0]
-            supplier_raw = row.iloc[3]
-            thickness_raw = row.iloc[10]
-            
-            # Новые поля из соответствующих столбцов
-            heating_score_raw = row.iloc[11]  # 12-й столбец (индекс 11)
-            coffee_score_raw = row.iloc[12]   # 13-й столбец (индекс 12)
-            oil_score_raw = row.iloc[13]      # 14-й столбец (индекс 13)
-            hardness_raw = row.iloc[9]        # 10-й столбец (индекс 9) - hardness
-
-            if pd.isna(sidak_raw) or pd.isna(supplier_raw) or pd.isna(thickness_raw):
-                skipped_count += 1
-                continue
-            
-            sidak = str(sidak_raw).strip()
-            supplier = str(supplier_raw).strip()
-            thickness_str = str(thickness_raw).strip().replace(",", ".")
-            
-            # Обработка новых полей
-            heating_score = None
-            if not pd.isna(heating_score_raw):
-                try:
-                    heating_score = int(float(heating_score_raw))
-                except (ValueError, TypeError):
-                    heating_score = None
-            
-            coffee_score = None
-            if not pd.isna(coffee_score_raw):
-                try:
-                    coffee_score = int(float(coffee_score_raw))
-                except (ValueError, TypeError):
-                    coffee_score = None
-            
-            oil_score = None
-            if not pd.isna(oil_score_raw):
-                try:
-                    oil_score = int(float(oil_score_raw))
-                except (ValueError, TypeError):
-                    oil_score = None
-            
-            hardness = None
-            if not pd.isna(hardness_raw):
-                hardness_str = str(hardness_raw).strip().upper()
-                # Проверяем, что значение находится в допустимом списке
-                valid_hardness = ['5B', '4B', '3B', '2B', 'B', 'HB', 'F', 'H', '2H', '3H', '4H', '5H']
-                if hardness_str in valid_hardness:
-                    hardness = hardness_str
-
-            try:
-                thickness = float(thickness_str)
-            except ValueError:
-                skipped_count += 1
-                continue
-
-            cur.execute("SELECT * FROM films WHERE sidak_num = ?", (sidak,))
-            exists = cur.fetchone()
-
-            if exists:
-                cur.execute("""
-                    UPDATE films SET 
-                    supplier_name = ?, 
-                    thickness = ?,
-                    heating_score = ?,
-                    coffee_score = ?,
-                    oil_score = ?,
-                    hardness = ?
-                    WHERE sidak_num = ?
-                """, (supplier, thickness, heating_score, coffee_score, oil_score, hardness, sidak))
-                updated_count += 1
-            else:
-                cur.execute("""
-                    INSERT INTO films 
-                    (sidak_num, supplier_name, thickness, heating_score, coffee_score, oil_score, hardness) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (sidak, supplier, thickness, heating_score, coffee_score, oil_score, hardness))
-                imported_count += 1
-        
-        conn.commit()
-        conn.close()
-        messagebox.showinfo("Импорт завершен", 
-                            f"Импортировано новых плёнок: {imported_count}\n"
-                            f"Обновлено существующих плёнок: {updated_count}\n"
-                            f"Пропущено некорректных или неактуальных строк: {skipped_count}")
-    except FileNotFoundError:
-        messagebox.showerror("Ошибка", "Файл 'Список пленок и толщин.xlsx' не найден.")
-    except Exception as e:
-        messagebox.showerror("Ошибка", f"Произошла ошибка при импорте: {e}")
 
 def edit_film_window():
     def on_film_selected(sidak_num):
@@ -273,6 +288,7 @@ def edit_film_window():
                 combo_edit_heating.set(str(details[2]) if details[2] is not None else "")
                 combo_edit_coffee.set(str(details[3]) if details[3] is not None else "")
                 combo_edit_oil.set(str(details[4]) if details[4] is not None else "")
+                # Твердость приходит из БД уже в виде строки "1"-"5" или None
                 combo_edit_hardness.set(details[5] if details[5] is not None else "")
             else:
                 entry_edit_supplier.delete(0, ctk.END)
@@ -302,6 +318,7 @@ def edit_film_window():
         oil_score = int(oil_score) if oil_score else None
         
         hardness = combo_edit_hardness.get()
+        # Значение hardness — это либо строка "1"-"5", либо пустая строка, преобразуем в None
         hardness = hardness if hardness != "" else None
 
         if not sidak:
@@ -354,9 +371,9 @@ def edit_film_window():
     win.title("Редактировать плёнку")
     win.geometry("400x550")
 
-    # Список вариантов для полей
+    # ИЗМЕНЕНО: Обновление списка для Твердости
     score_options = ["", "1", "2", "3", "4", "5"]
-    hardness_options = ["", "5B", "4B", "3B", "2B", "B", "HB", "F", "H", "2H", "3H", "4H", "5H"]
+    hardness_options = ["", "1", "2", "3", "4", "5"]
 
     ctk.CTkLabel(win, text="Введите или выберите номер Sidak").place(x=50, y=20)
 
@@ -403,7 +420,7 @@ def edit_film_window():
     combo_edit_hardness.place(x=50, y=y_pos + 30)
 
     btn_save = ctk.CTkButton(win, text="Сохранить изменения", command=update_film, 
-                           fg_color="blue", hover_color="darkblue", state="disabled")
+                            fg_color="blue", hover_color="darkblue", state="disabled")
     btn_save.place(x=100, y=y_pos + 70)
 
     entry_sidak.bind("<KeyRelease>", check_film_exists)
@@ -481,6 +498,3 @@ def create_filterable_sidak_selector(parent, initial_x, initial_y, width, on_sel
     entry_sidak.bind("<KeyRelease>", filter_sidak)
 
     return entry_sidak, results_frame
-
-
-

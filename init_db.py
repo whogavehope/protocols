@@ -21,26 +21,30 @@ def init_db():
         ) VIRTUAL,
         -- Новые дополнительные поля
         heating_score INTEGER CHECK(heating_score >= 1 AND heating_score <= 5),
-        coffee_score INTEGER,
-        oil_score INTEGER,
-        hardness TEXT,  -- Для значений "HB", "2B" и т.д.
+        coffee_score INTEGER CHECK(coffee_score >= 1 AND coffee_score <= 5),
+        oil_score INTEGER CHECK(oil_score >= 1 AND oil_score <= 5),
+        -- ИЗМЕНЕНО: Твердость теперь цифровое значение '1'-'5' (хранится как текст)
+        hardness TEXT CHECK(hardness IS NULL OR (hardness IN ('1', '2', '3', '4', '5'))), 
+        
+        -- ИЗМЕНЕНО: Логика hardness_score для цифровых значений
         hardness_score INTEGER GENERATED ALWAYS AS (
             CASE 
-                WHEN hardness = '5B' THEN 1
-                WHEN hardness = '4B' THEN 2
-                WHEN hardness = '3B' THEN 3
-                WHEN hardness = '2B' THEN 4
-                WHEN hardness IN ('B', 'HB', 'F', 'H', '2H', '3H', '4H', '5H') THEN 5
+                WHEN hardness = '1' THEN 1
+                WHEN hardness = '2' THEN 2
+                WHEN hardness = '3' THEN 3
+                WHEN hardness = '4' THEN 4
+                WHEN hardness = '5' THEN 5
                 ELSE NULL
             END
         ) VIRTUAL,
+        
         ics_percent REAL GENERATED ALWAYS AS (
             CASE WHEN thickness_score IS NOT NULL 
-                  AND heating_score IS NOT NULL 
-                  AND coffee_score IS NOT NULL 
-                  AND oil_score IS NOT NULL 
-                  AND hardness_score IS NOT NULL
-                 THEN ROUND((thickness_score + heating_score + coffee_score + oil_score + hardness_score) / 25.0 * 100, 2)
+                      AND heating_score IS NOT NULL 
+                      AND coffee_score IS NOT NULL 
+                      AND oil_score IS NOT NULL 
+                      AND hardness_score IS NOT NULL
+                     THEN ROUND((thickness_score + heating_score + coffee_score + oil_score + hardness_score) / 25.0 * 100, 2)
             END
         ) VIRTUAL,
         quality_level TEXT  -- Уровень качества
