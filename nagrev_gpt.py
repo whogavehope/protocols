@@ -707,8 +707,8 @@ def show_input_form():
     ctk.CTkLabel(top, text="Автор").grid(row=1, column=0, sticky="w", padx=10, pady=5)
     combo_author = ctk.CTkComboBox(top, values=[
         "Руководитель службы качества Камынин В.А.",
-        "Специалист по качеству Павлова Н.А.",
-        "Специалист по качеству Сидорова А.И.",
+        "Ведущий специалист по качеству Павлова Н.А.",
+        "Ведущий специалист по качеству Сидорова А.И.",
     ])
     combo_author.set("Руководитель службы качества Камынин В.А.")
     combo_author.grid(row=1, column=1, padx=5, pady=2, sticky="ew")
